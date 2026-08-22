@@ -97,6 +97,10 @@ export class Backup extends KubeObject<CnpgBackup> {
     return this.spec.target;
   }
 
+  get pluginConfiguration(): { name: string; parameters?: Record<string, string> } | undefined {
+    return this.spec.pluginConfiguration;
+  }
+
   get phase(): string | undefined {
     return this.status.phase;
   }
