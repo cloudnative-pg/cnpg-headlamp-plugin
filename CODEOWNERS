@@ -6,4 +6,4 @@
 # CODEOWNERS only honors the LAST matching pattern for a given path —
 # it does not merge an earlier, less-specific rule into a later one.
 
-* @cloudnative-pg/cnpg-template-owners @cloudnative-pg/admins
+* @cloudnative-pg/cnpg-headlamp-plugin-owners
