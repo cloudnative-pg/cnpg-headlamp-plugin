@@ -1,3 +1,5 @@
+[![CloudNativePG](./logo/cloudnativepg.png)](https://cloudnative-pg.io/)
+
 # CNPG Headlamp Plugin
 
 A [Headlamp](https://headlamp.dev/) plugin for managing and visualizing [CloudNativePG](https://cloudnative-pg.io/) (CNPG) resources — Clusters, Poolers, Backups, Scheduled Backups, and Database objects — directly from the Headlamp UI.
