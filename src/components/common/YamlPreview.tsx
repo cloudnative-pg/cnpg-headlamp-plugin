@@ -7,7 +7,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import { useTheme } from '@mui/material/styles';
 import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
-import yaml from 'js-yaml';
+import { dump, load } from 'js-yaml';
 import { useMemo, useState } from 'react';
 
 interface YamlPreviewProps {
@@ -27,7 +27,7 @@ interface YamlPreviewProps {
 // Uses the same Monaco editor Headlamp's own YAML dialogs use.
 export function YamlPreview({ manifest, title = 'Review YAML', onOverrideChange }: YamlPreviewProps) {
   const theme = useTheme();
-  const formYaml = useMemo(() => yaml.dump(manifest), [manifest]);
+  const formYaml = useMemo(() => dump(manifest), [manifest]);
   const [editing, setEditing] = useState(false);
   const [editedYaml, setEditedYaml] = useState(formYaml);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export function YamlPreview({ manifest, title = 'Review YAML', onOverrideChange 
     const text = value ?? '';
     setEditedYaml(text);
     try {
-      const parsed = yaml.load(text);
+      const parsed = load(text);
       if (parsed && typeof parsed === 'object') {
         setParseError(null);
         onOverrideChange?.(parsed as object);
