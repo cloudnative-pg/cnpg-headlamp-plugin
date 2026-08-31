@@ -49,6 +49,11 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: headlamp/backend/go.mod
+          # cache defaults to true and would key/populate the Go module cache
+          # from headlamp/backend/go.sum in the untrusted checkout above —
+          # the same cache-poisoning vector removed from setup-node earlier
+          # in this job.
+          cache: false
 
       - name: Install Headlamp backend + frontend (skip Electron app/tools)
         working-directory: headlamp
