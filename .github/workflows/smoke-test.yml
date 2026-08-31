@@ -38,7 +38,13 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
+          # No cache: here. setup-node's npm cache saves the whole ~/.npm
+          # directory for the job, and the "Install Headlamp backend +
+          # frontend" step below runs `npm install` against the untrusted
+          # checkout at inputs['headlamp-ref'] — scoping the cache *key* to
+          # this repo's own lockfile still leaves the cache *contents*
+          # poisonable by that untrusted install on this schedule/
+          # workflow_dispatch-triggered (default-branch, privileged) workflow.
 
       - uses: actions/setup-go@v7
         with:
