@@ -8,16 +8,6 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      headlamp-ref:
-        description: 'git ref of kubernetes-sigs/headlamp to check out'
-        default: main
-        required: false
-      cnpg-version:
-        description: 'CloudNativePG operator version to install'
-        default: '1.30.0'
-        required: false
 
 jobs:
   smoke-test:
@@ -30,7 +20,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: kubernetes-sigs/headlamp
-          ref: ${{ inputs['headlamp-ref'] || 'main' }}
           path: headlamp
 
       - uses: actions/setup-node@v7
@@ -38,11 +27,9 @@ jobs:
           node-version: 22
           # No cache: here. setup-node's npm cache saves the whole ~/.npm
           # directory for the job, and the "Install Headlamp backend +
-          # frontend" step below runs `npm install` against the untrusted
-          # checkout at inputs['headlamp-ref'] — scoping the cache *key* to
-          # this repo's own lockfile still leaves the cache *contents*
-          # poisonable by that untrusted install on this schedule/
-          # workflow_dispatch-triggered (default-branch, privileged) workflow.
+          # frontend" step below runs `npm install` against the headlamp
+          # checkout — scoping the cache *key* to this repo's own lockfile
+          # still leaves the cache *contents* poisonable by that install.
 
       - uses: actions/setup-go@v7
         with:
@@ -67,7 +54,7 @@ jobs:
 
       - name: Install CloudNativePG operator
         env:
-          CNPG_VERSION: ${{ inputs['cnpg-version'] || '1.30.0' }}
+          CNPG_VERSION: '1.30.0'
         run: |
           CNPG_BRANCH="release-${CNPG_VERSION%.*}"
           kubectl apply --server-side -f \
