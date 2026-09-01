@@ -1,0 +1,16 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["custom.regex"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Bump the CloudNativePG operator version pinned in the smoke-test workflow",
+      "managerFilePatterns": ["/^\\.github/workflows/smoke-test\\.yml$/"],
+      "matchStrings": ["CNPG_VERSION: '(?<currentValue>[\\d.]+)'"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "cloudnative-pg/cloudnative-pg",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    }
+  ]
+}
