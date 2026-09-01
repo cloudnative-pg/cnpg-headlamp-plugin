@@ -255,7 +255,7 @@ const detailHref = await evaluate(`(() => {
 if (!detailHref) {
   console.log('   (no clusters in this namespace — detail page not exercised)');
 } else {
-  await navigateAndSettle(detailHref.replace(/^#/, '#'));
+  await navigateAndSettle(detailHref);
   console.log(
     '   ' +
       (await evaluate(`(() => {
