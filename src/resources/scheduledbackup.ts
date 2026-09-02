@@ -86,6 +86,10 @@ export class ScheduledBackup extends KubeObject<CnpgScheduledBackup> {
     return this.spec.target;
   }
 
+  get pluginConfiguration(): { name: string; parameters?: Record<string, string> } | undefined {
+    return this.spec.pluginConfiguration;
+  }
+
   get lastCheckTime(): string | undefined {
     return this.status.lastCheckTime;
   }

@@ -1,6 +1,7 @@
 import { DetailsGrid } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { useParams } from 'react-router-dom';
 import { Backup } from '../../resources/backup';
+import { PluginConfigurationParameters } from '../common/PluginConfigurationParameters';
 import { BackupPhaseLabel } from './List';
 
 export function BackupDetail() {
@@ -21,6 +22,22 @@ export function BackupDetail() {
             name: 'Method',
             value: item.method,
           },
+          ...(item.method === 'plugin' || !!item.pluginConfiguration
+            ? [
+                {
+                  name: 'Plugin Name',
+                  value: item.pluginConfiguration?.name ?? '',
+                },
+                {
+                  name: 'Plugin Configuration Parameters',
+                  value: (
+                    <PluginConfigurationParameters
+                      parameters={item.pluginConfiguration?.parameters}
+                    />
+                  ),
+                },
+              ]
+            : []),
           {
             name: 'Target',
             value: item.target ?? 'Cluster default',

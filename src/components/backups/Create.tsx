@@ -22,6 +22,7 @@ interface BackupFormState {
   clusterName: string;
   method: BackupMethod;
   pluginName: string;
+  pluginParameters: { key: string; value: string }[];
   target: BackupTarget | '';
 }
 
@@ -34,7 +35,14 @@ function buildBackupManifest(state: BackupFormState) {
   };
 
   if (state.method === 'plugin' && state.pluginName) {
-    spec.pluginConfiguration = { name: state.pluginName };
+    const parameters = state.pluginParameters
+      .map(p => ({ key: p.key.trim(), value: p.value }))
+      .filter(p => p.key)
+      .reduce<Record<string, string>>((acc, p) => ({ ...acc, [p.key]: p.value }), {});
+    spec.pluginConfiguration = {
+      name: state.pluginName,
+      ...(Object.keys(parameters).length > 0 && { parameters }),
+    };
   }
 
   if (state.target) {
@@ -66,7 +74,7 @@ function BackupCreateForm({ onClose }: { onClose: () => void }) {
   );
 
   const methodState = useBackupMethodState(selectedCluster);
-  const { method, pluginName, target, hasAnyMethod } = methodState;
+  const { method, pluginName, pluginParameters, target, hasAnyMethod } = methodState;
 
   const manifest = useMemo(
     () =>
@@ -76,9 +84,10 @@ function BackupCreateForm({ onClose }: { onClose: () => void }) {
         clusterName: selectedCluster?.getName() ?? '',
         method,
         pluginName,
+        pluginParameters,
         target,
       }),
-    [selectedCluster, name, method, pluginName, target]
+    [selectedCluster, name, method, pluginName, pluginParameters, target]
   );
 
   const canSubmit =
