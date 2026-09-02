@@ -24,7 +24,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           # No cache: here. setup-node's npm cache saves the whole ~/.npm
           # directory for the job, and the "Install Headlamp backend +
           # frontend" step below runs `npm install` against the headlamp
