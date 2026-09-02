@@ -1,7 +1,7 @@
 import { ActionButton, DetailsGrid } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { useParams } from 'react-router-dom';
-import { PluginConfigurationParameters } from '../common/PluginConfigurationParameters';
 import { ScheduledBackup } from '../../resources/scheduledbackup';
+import { PluginConfigurationParameters } from '../common/PluginConfigurationParameters';
 import { ScheduledBackupScheduleLabel, ScheduledBackupSuspendLabel } from './List';
 import { launchTriggerBackup } from './TriggerBackup';
 

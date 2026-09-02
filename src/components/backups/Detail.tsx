@@ -1,7 +1,7 @@
 import { DetailsGrid } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { useParams } from 'react-router-dom';
-import { PluginConfigurationParameters } from '../common/PluginConfigurationParameters';
 import { Backup } from '../../resources/backup';
+import { PluginConfigurationParameters } from '../common/PluginConfigurationParameters';
 import { BackupPhaseLabel } from './List';
 
 export function BackupDetail() {
