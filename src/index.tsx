@@ -21,6 +21,8 @@ import { ClusterImageCatalogDetail } from './components/clusterimagecatalogs/Det
 import { ClusterImageCatalogsList } from './components/clusterimagecatalogs/List';
 import { ClusterDetail } from './components/clusters/Detail';
 import { ClustersList } from './components/clusters/List';
+import { PodLogsPage } from './components/common/podLogs';
+import { PodTerminalPage } from './components/common/podTerminal';
 import { DatabaseRoleDetail } from './components/databaseroles/Detail';
 import { DatabaseRolesList } from './components/databaseroles/List';
 import { DatabaseDetail } from './components/databases/Detail';
@@ -359,4 +361,31 @@ registerRoute({
   name: 'CNPG Cluster Image Catalog',
   exact: true,
   component: () => <ClusterImageCatalogDetail />,
+});
+
+// Reached only via the "View logs" action on a pod (cluster/pooler/status pages), never directly
+// from the sidebar — but `sidebar: null` (rather than pointing at an existing entry) would hide
+// the *entire* sidebar while this route is active, not just skip highlighting an item, per
+// Sidebar.js's `sidebar.selected.sidebar === null` check. 'cnpg-clusters' keeps the sidebar
+// visible; which entry it highlights doesn't matter much since pods aren't in the sidebar anyway.
+// A standalone page rather than an Activity overlay: see the comment on PodLogsPage for why the
+// Activity approach broke in Headlamp 0.45.
+registerRoute({
+  path: '/cnpg/pods/:namespace/:name/logs',
+  sidebar: 'cnpg-clusters',
+  name: 'CNPG Pod Logs',
+  exact: true,
+  component: () => <PodLogsPage />,
+});
+
+// Same rationale as the route above (see its comment): reached only via the "Open terminal"
+// action, never the sidebar, and a standalone page rather than an Activity overlay because
+// Terminal's noDialog mode has the same '.xterm { height: 100vh }' assumption that broke inside
+// Headlamp 0.45's Activities framework.
+registerRoute({
+  path: '/cnpg/pods/:namespace/:name/terminal',
+  sidebar: 'cnpg-clusters',
+  name: 'CNPG Pod Terminal',
+  exact: true,
+  component: () => <PodTerminalPage />,
 });

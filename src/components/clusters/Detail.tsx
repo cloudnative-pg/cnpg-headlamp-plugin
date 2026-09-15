@@ -15,13 +15,9 @@ import { useHistory, useParams } from 'react-router-dom';
 import { Cluster } from '../../resources/cluster';
 import { FailoverQuorum } from '../../resources/failoverQuorum';
 import { Pooler } from '../../resources/pooler';
-import {
-  launchLogs,
-  launchTerminal,
-  Pod,
-  PodPhaseLabel,
-  PodStatusLabel,
-} from '../common/podActions';
+import { Pod, PodPhaseLabel, PodStatusLabel } from '../common/podActions';
+import { ViewLogsButton } from '../common/podLogs';
+import { OpenTerminalButton } from '../common/podTerminal';
 import { PoolerStatusLabel } from '../poolers/List';
 import { launchConnectActivity } from './connect';
 import { SwitchoverAction } from './switchover';
@@ -37,16 +33,8 @@ function sortByName<T extends { getName(): string }>(items: T[] | null | undefin
 function InstanceActions({ cluster, pod }: { cluster: Cluster; pod: Pod }) {
   return (
     <>
-      <ActionButton
-        description="View logs"
-        icon="mdi:file-document-box-outline"
-        onClick={() => launchLogs(pod)}
-      />
-      <ActionButton
-        description="Open terminal"
-        icon="mdi:console"
-        onClick={() => launchTerminal(pod)}
-      />
+      <ViewLogsButton pod={pod} />
+      <OpenTerminalButton pod={pod} />
       {pod.getName() !== cluster.currentPrimary && !cluster.isSwitchoverInProgress && (
         <SwitchoverAction cluster={cluster} pod={pod} />
       )}
@@ -57,13 +45,7 @@ function InstanceActions({ cluster, pod }: { cluster: Cluster; pod: Pod }) {
 // Bootstrap job pods (initdb/join/full-recovery/...) don't have a running container to exec
 // into once complete, so only logs make sense here — no terminal action.
 function JobActions({ pod }: { pod: Pod }) {
-  return (
-    <ActionButton
-      description="View logs"
-      icon="mdi:file-document-box-outline"
-      onClick={() => launchLogs(pod)}
-    />
-  );
+  return <ViewLogsButton pod={pod} />;
 }
 
 function InstanceRoleLabel({ pod }: { pod: Pod }) {

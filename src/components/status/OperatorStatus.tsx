@@ -1,6 +1,5 @@
 import { K8s } from '@kinvolk/headlamp-plugin/lib';
 import {
-  ActionButton,
   ResourceLink,
   SectionBox,
   SimpleTable,
@@ -8,7 +7,8 @@ import {
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
-import { launchLogs, Pod, PodStatusLabel } from '../common/podActions';
+import { Pod, PodStatusLabel } from '../common/podActions';
+import { ViewLogsButton } from '../common/podLogs';
 
 type Crd = InstanceType<typeof K8s.ResourceClasses.CustomResourceDefinition>;
 
@@ -141,13 +141,7 @@ function OperatorPodsSection() {
             { label: 'Status', getter: (pod: Pod) => <PodStatusLabel pod={pod} /> },
             {
               label: 'Actions',
-              getter: (pod: Pod) => (
-                <ActionButton
-                  description="View logs"
-                  icon="mdi:file-document-box-outline"
-                  onClick={() => launchLogs(pod)}
-                />
-              ),
+              getter: (pod: Pod) => <ViewLogsButton pod={pod} />,
             },
           ]}
           data={pods ?? []}
@@ -207,13 +201,7 @@ function PluginPodsSection({ service }: { service: Service }) {
           { label: 'Status', getter: (pod: Pod) => <PodStatusLabel pod={pod} /> },
           {
             label: 'Actions',
-            getter: (pod: Pod) => (
-              <ActionButton
-                description="View logs"
-                icon="mdi:file-document-box-outline"
-                onClick={() => launchLogs(pod)}
-              />
-            ),
+            getter: (pod: Pod) => <ViewLogsButton pod={pod} />,
           },
         ]}
         data={pods ?? []}
