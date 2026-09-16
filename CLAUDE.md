@@ -63,7 +63,14 @@ These cost real debugging time — check here before re-deriving them:
 
 ## Commit message style
 
-Trailers in this repo are `Assisted-by: Claude` followed by `Signed-off-by: <name> <email>` (added by `git commit -s`) — not the `Co-Authored-By:` trailer some tooling defaults to. Match the existing `git log` for subject/body tone (imperative subject, body explains *why*, not a restatement of the diff).
+Commit subjects follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): `<type>[optional scope]: <description>`, e.g. `feat(clusters): add switchover action` or `fix: pin smoke-test's headlamp checkout to v0.45.0`. This is required, not just style — `release-please` (see `release-please-config.json`) parses commit types to decide version bumps and generate `CHANGELOG.md`, so a miscategorized type has a real effect on the next release.
+
+- Common types: `feat` (new user-facing functionality — triggers a minor bump), `fix` (bug fix — triggers a patch bump), `chore`, `docs`, `refactor`, `test`, `ci`, `build`. A breaking change adds `!` after the type/scope (e.g. `feat!:`) or a `BREAKING CHANGE:` footer — triggers a major bump (or a minor bump pre-1.0, per `bump-minor-pre-major` in the config).
+- Scope (optional) is a short noun for the affected area, e.g. `(clusters)`, `(backups)`, `(ci)`.
+- Description is imperative mood, lowercase, no trailing period.
+- Body (optional, blank line after the subject) explains *why*, not a restatement of the diff.
+- Trailers in this repo are `Assisted-by: Claude` followed by `Signed-off-by: <name> <email>` (added by `git commit -s`) — not the `Co-Authored-By:` trailer some tooling defaults to.
+- Match the existing `git log` for tone within this convention.
 
 ## Notes
 
