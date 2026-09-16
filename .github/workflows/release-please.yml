@@ -1,0 +1,33 @@
+name: release-please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: read-all
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # TODO: googleapis/release-please-action cannot sign commits yet.
+      #   We'll use the cli until there's a fix for
+      #   https://github.com/googleapis/release-please/issues/2280.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # TODO: remove bump-minor-pre-major when in production. It prevents
+      #   release-please from bumping the major version on breaking changes.
+      - run: |
+          npx release-please release-pr \
+            --token="${{ secrets.REPO_PAT }}" \
+            --repo-url="${{ github.repository }}" \
+            --bump-minor-pre-major=true \
+            --signoff "Peggie <info@cloudnative-pg.io>";
+          npx release-please github-release \
+            --token="${{ secrets.REPO_PAT }}" \
+            --repo-url="${{ github.repository }}" \
