@@ -4,6 +4,23 @@
 
 A [Headlamp](https://headlamp.dev/) plugin for managing and visualizing [CloudNativePG](https://cloudnative-pg.io/) (CNPG) resources — Clusters, Poolers, Backups, Scheduled Backups, and Database objects — directly from the Headlamp UI.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="img/operator-status.png" alt="Operator status page" width="400"></td>
+    <td><img src="img/cluster-list.png" alt="Cluster list" width="400"></td>
+  </tr>
+  <tr>
+    <td><img src="img/cluster-detail.png" alt="Cluster detail" width="400"></td>
+    <td><img src="img/cluster-form.png" alt="Cluster creation form" width="400"></td>
+  </tr>
+  <tr>
+    <td><img src="img/scheduled-backup-list.png" alt="Scheduled backups list" width="400"></td>
+    <td><img src="img/database-detail.png" alt="Database detail" width="400"></td>
+  </tr>
+</table>
+
 ## Features
 
 #### Clusters
@@ -87,23 +104,6 @@ mise exec node@24 -- node scripts/cdp-verify.mjs [cluster-name]   # default: kin
 ```
 
 The script exits non-zero if this plugin fails to load or a route renders nothing.
-
-## Screenshots
-
-<table>
-  <tr>
-    <td><img src="img/operator-status.png" alt="Operator status page" width="400"></td>
-    <td><img src="img/cluster-list.png" alt="Cluster list" width="400"></td>
-  </tr>
-  <tr>
-    <td><img src="img/cluster-detail.png" alt="Cluster detail" width="400"></td>
-    <td><img src="img/cluster-form.png" alt="Cluster creation form" width="400"></td>
-  </tr>
-  <tr>
-    <td><img src="img/scheduled-backup-list.png" alt="Scheduled backups list" width="400"></td>
-    <td><img src="img/database-detail.png" alt="Database detail" width="400"></td>
-  </tr>
-</table>
 
 ## License
 
