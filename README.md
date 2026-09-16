@@ -104,6 +104,9 @@ The script exits non-zero if this plugin fails to load or a route renders nothin
     <td><img src="img/scheduled-backup-list.png" alt="Scheduled backups list" width="400"></td>
     <td><img src="img/database-detail.png" alt="Database detail" width="400"></td>
   </tr>
+    <tr>
+    <td><img src="img/live-metrics.png" alt="Live Metrics" width="400"></td>
+  </tr>
 </table>
 
 ## License
