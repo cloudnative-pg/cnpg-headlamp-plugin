@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react';
 import { K8s, Router } from '@kinvolk/headlamp-plugin/lib';
 import {
   ActionButton,
@@ -10,7 +11,12 @@ import {
   StatusLabel,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { localeDate } from '@kinvolk/headlamp-plugin/lib/Utils';
+import Box from '@mui/material/Box';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import { useState } from 'react';
 import { useHistory, useParams } from 'react-router-dom';
 import { Cluster } from '../../resources/cluster';
 import { FailoverQuorum } from '../../resources/failoverQuorum';
@@ -18,6 +24,13 @@ import { Pooler } from '../../resources/pooler';
 import { Pod, PodPhaseLabel, PodStatusLabel } from '../common/podActions';
 import { ViewLogsButton } from '../common/podLogs';
 import { OpenTerminalButton } from '../common/podTerminal';
+import {
+  GENERAL_HEALTH,
+  groupMetricsByCategory,
+  POSTGRES_METRICS,
+  PostgresMetric,
+} from '../common/postgresMetrics';
+import { usePsqlValue } from '../common/psqlExec';
 import { PoolerStatusLabel } from '../poolers/List';
 import { launchConnectActivity } from './connect';
 import { SwitchoverAction } from './switchover';
@@ -111,6 +124,156 @@ function InstancesSection({ cluster }: { cluster: Cluster }) {
         ]}
         data={sortByName(pods)}
       />
+    </SectionBox>
+  );
+}
+
+// Its own component, not inlined in MetricsSection's .map(): usePsqlValue is a hook.
+function MetricTile({
+  pod,
+  metric,
+  refreshIntervalSeconds,
+}: {
+  pod: Pod | null;
+  metric: PostgresMetric;
+  refreshIntervalSeconds: number;
+}) {
+  const result = usePsqlValue(pod, metric.database, metric.query, refreshIntervalSeconds);
+
+  return (
+    <Box
+      sx={{
+        position: 'relative',
+        width: 140,
+        height: 140,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 1,
+        p: 1,
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 1,
+        textAlign: 'center',
+      }}
+    >
+      <Tooltip
+        title={
+          <Box
+            component="pre"
+            sx={{ m: 0, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre-wrap' }}
+          >
+            {metric.query}
+          </Box>
+        }
+      >
+        <span style={{ position: 'absolute', top: 4, right: 4, display: 'flex' }}>
+          <Icon icon="mdi:information-outline" width={14} height={14} />
+        </span>
+      </Tooltip>
+      {result.loading ? (
+        <Typography variant="body2" color="text.secondary">
+          Loading…
+        </Typography>
+      ) : result.error ? (
+        <Tooltip title={result.error}>
+          <span>
+            <StatusLabel status="error">Error</StatusLabel>
+          </span>
+        </Tooltip>
+      ) : (
+        <Typography variant="h6" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
+          {result.output || '0'}
+        </Typography>
+      )}
+      <Typography variant="caption" color="text.secondary">
+        {metric.label}
+        {metric.primaryOnly && ' (primary)'}
+      </Typography>
+    </Box>
+  );
+}
+
+function MetricsSection({ cluster }: { cluster: Cluster }) {
+  const [pods] = K8s.ResourceClasses.Pod.useList({
+    namespace: cluster.getNamespace(),
+    labelSelector: `cnpg.io/cluster=${cluster.getName()},cnpg.io/podRole=instance`,
+  });
+  const [selectedInstance, setSelectedInstance] = useState(cluster.currentPrimary ?? '');
+  const [refreshSeconds, setRefreshSeconds] = useState(0);
+
+  // cluster.currentPrimary can be briefly empty while bootstrapping.
+  if (!cluster.currentPrimary) {
+    return null;
+  }
+
+  const primaryPod = pods?.find(pod => pod.getName() === cluster.currentPrimary) ?? null;
+  const selectedPod = pods?.find(pod => pod.getName() === selectedInstance) ?? primaryPod;
+  const instanceOptions = sortByName(pods).sort((a, b) =>
+    a.getName() === cluster.currentPrimary ? -1 : b.getName() === cluster.currentPrimary ? 1 : 0
+  );
+
+  return (
+    <SectionBox
+      title="Live Metrics"
+      headerProps={{
+        actions: [
+          <Select
+            key="refresh-interval"
+            size="small"
+            value={refreshSeconds}
+            onChange={e => setRefreshSeconds(Number(e.target.value))}
+            sx={{ minWidth: 160 }}
+          >
+            <MenuItem value={0}>Auto refresh: Off</MenuItem>
+            <MenuItem value={5}>Refresh every 5s</MenuItem>
+            <MenuItem value={10}>Refresh every 10s</MenuItem>
+            <MenuItem value={30}>Refresh every 30s</MenuItem>
+          </Select>,
+        ],
+      }}
+    >
+      {groupMetricsByCategory(POSTGRES_METRICS).map(([category, entries]) => (
+        <Box key={category} sx={{ mb: 3, '&:last-child': { mb: 0 } }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1,
+              mb: 1,
+            }}
+          >
+            <Typography variant="subtitle2">{category}</Typography>
+            {category === GENERAL_HEALTH && (
+              <Select
+                size="small"
+                value={selectedInstance}
+                onChange={e => setSelectedInstance(e.target.value)}
+                sx={{ minWidth: 220 }}
+              >
+                {instanceOptions.map(pod => (
+                  <MenuItem key={pod.getName()} value={pod.getName()}>
+                    {pod.getName()} ({pod.metadata.labels?.['cnpg.io/instanceRole'] ?? '-'})
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+            {entries.map(([id, metric]) => (
+              <MetricTile
+                key={id}
+                pod={metric.primaryOnly ? primaryPod : selectedPod}
+                metric={metric}
+                refreshIntervalSeconds={refreshSeconds}
+              />
+            ))}
+          </Box>
+        </Box>
+      ))}
     </SectionBox>
   );
 }
@@ -486,6 +649,10 @@ export function ClusterDetail() {
           {
             id: 'instances',
             section: <InstancesSection cluster={item} />,
+          },
+          {
+            id: 'metrics',
+            section: <MetricsSection cluster={item} />,
           },
           {
             id: 'jobs',
