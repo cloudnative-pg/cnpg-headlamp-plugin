@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
-    "cronstrue": "^3.24.0",
+    "cronstrue": "^3.26.0",
     "js-yaml": "^5.4.2",
     "notistack": "^3.0.2"
   }
