@@ -14,6 +14,7 @@ List and detail views, plus a guided creation form.
 - Instance roles and synchronous replication warnings
 - Per-instance Postgres logs (filterable, color-coded, live-following)
 - A `psql` terminal against the primary or any replica
+- A **Live Metrics** section on the cluster's detail page: Postgres metrics as square tiles, grouped by category, each read via `psql` exec, with an (i) icon showing the exact query, an optional auto-refresh interval (5s/10s/30s/off), and general health (active connections, cache hit ratio, database size, blocked queries, deadlocks) switchable per instance via a dropdown; CNPG-specific replication/archiving state (connected standbys, replication lag, inactive replication slots, WAL archiving failures) always reads the primary
 - A manual **switchover** action to promote a chosen replica to primary
 - Leader-election **lease** details (holder, acquire/renew time, duration, transitions) alongside the cluster's main info
 - Creation form (with live YAML preview) covering instances/HA, storage and tablespaces, backup configuration, volume snapshots, and bootstrap — including bootstrapping a new cluster from an existing backup
@@ -102,6 +103,9 @@ The script exits non-zero if this plugin fails to load or a route renders nothin
   <tr>
     <td><img src="img/scheduled-backup-list.png" alt="Scheduled backups list" width="400"></td>
     <td><img src="img/database-detail.png" alt="Database detail" width="400"></td>
+  </tr>
+    <tr>
+    <td><img src="img/live-metrics.png" alt="Live Metrics" width="400"></td>
   </tr>
 </table>
 
