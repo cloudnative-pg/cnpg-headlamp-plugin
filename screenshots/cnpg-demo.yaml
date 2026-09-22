@@ -1,0 +1,72 @@
+# Demo data for README screenshots.
+#
+# Apply against whatever cluster your local Headlamp points at:
+#   kubectl apply -f screenshots/cnpg-demo.yaml
+# or:
+#   ./screenshots/seed-demo.sh
+#
+# Design notes:
+# - Everything lives in `cnpg-demo` so it is easy to tear down
+#   (`kubectl delete namespace cnpg-demo`) and never collides with real workloads.
+# - The Cluster uses 3 instances + 1Gi storage so the list shows health pills,
+#   the primary/replica topology, and the sync-replication warning — the parts
+#   the README shots are meant to show. Drop `instances` to 1 on small laptops.
+# - ScheduledBackup uses `method: volumeSnapshot` so no S3/ObjectStore is needed.
+#   It will sit un-reconciled on clusters without a VolumeSnapshotClass — that is
+#   fine for screenshots, the row and detail page still render.
+# - The metrics exporter (:9187) is on by default, so `live-metrics.png` works
+#   once the instances are Running; give it a few minutes on first boot.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cnpg-demo
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: demo-pg
+  namespace: cnpg-demo
+spec:
+  instances: 3
+  storage:
+    size: 1Gi
+    storageClass: csi-hostpath-sc
+  backup:
+    volumeSnapshot:
+      className: csi-hostpath-snapclass
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: demo-pg-rw
+  namespace: cnpg-demo
+spec:
+  cluster:
+    name: demo-pg
+  instances: 2
+  type: rw
+  pgbouncer:
+    poolMode: transaction
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: demo-db
+  namespace: cnpg-demo
+spec:
+  cluster:
+    name: demo-pg
+  name: demo-db
+  owner: app
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: demo-daily
+  namespace: cnpg-demo
+spec:
+  schedule: '0 0 0 * * *'
+  cluster:
+    name: demo-pg
+  backupOwnerReference: self
+  method: volumeSnapshot
