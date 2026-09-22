@@ -249,10 +249,35 @@ const shots = [
       if (!ready) throw new Error('create form overlay did not open');
       await sleep(800);
       await capture(`${OUT_DIR}/cluster-form.png`);
-      // Dismiss the overlay so later shots start clean.
-      await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
-      await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape' });
-      await sleep(500);
+      // Dismiss the overlay so later shots start clean. Escape alone doesn't cut it:
+      // Headlamp's split-right Activity panel doesn't listen for it, so the form used
+      // to leak into the scheduled-backup-list shot. Click the panel's close button
+      // like a user would, verify the form actually went away, and reload as a last
+      // resort (Activities are in-memory, so a reload always clears them).
+      await evaluate(`(() => {
+        const titleEl = Array.from(document.querySelectorAll('*')).find(
+          e => e.children.length === 0 && (e.textContent || '').trim() === 'Create / Restore Cluster'
+        );
+        const scope =
+          (titleEl && titleEl.closest('[role="dialog"], aside, [class*="MuiDrawer"], [class*="MuiDialog"]')) ||
+          document;
+        const closeBtn = Array.from(scope.querySelectorAll('button')).find(
+          b =>
+            /close/i.test(b.getAttribute('aria-label') || b.getAttribute('title') || '') ||
+            ['Close', 'Cancel'].includes((b.textContent || '').trim())
+        );
+        closeBtn?.click();
+      })()`);
+      await sleep(800);
+      // 'YAML' comes from the form's YamlPreview — it isn't on the list page, so its
+      // absence proves the overlay closed.
+      const closed = await evaluate(`!document.body.textContent.includes('YAML')`);
+      if (!closed) {
+        console.warn('  warning: create overlay did not close — reloading to clear it');
+        await send('Page.reload');
+        await sleep(4000);
+        await navigateAndSettle(`#/c/${CLUSTER}/cnpg/clusters`);
+      }
     },
   },
   {
