@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "enabledManagers": ["custom.regex"],
+  "enabledManagers": ["custom.regex", "npm"],
   "customManagers": [
     {
       "customType": "regex",
@@ -10,6 +10,15 @@
       "matchStrings": ["CNPG_VERSION: '(?<currentValue>[\\d.]+)'"],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "cloudnative-pg/cloudnative-pg",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Bump the Headlamp version pinned in the smoke-test workflow",
+      "managerFilePatterns": ["/^\\.github/workflows/smoke-test\\.yml$/"],
+      "matchStrings": ["ref: \"v(?<currentValue>[\\d.]+)\""],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "kubernetes-sigs/headlamp",
       "extractVersionTemplate": "^v(?<version>.*)$"
     }
   ]
