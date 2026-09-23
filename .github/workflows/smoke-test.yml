@@ -55,7 +55,7 @@ jobs:
 
       - name: Install CloudNativePG operator
         env:
-          CNPG_VERSION: '1.30.0'
+          CNPG_VERSION: '1.30.1'
         run: |
           CNPG_BRANCH="release-${CNPG_VERSION%.*}"
           kubectl apply --server-side -f \
