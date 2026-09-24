@@ -1,0 +1,5 @@
+# Proves ownership of this repository to ArtifactHub when registering it
+# as a Headlamp plugin repository.
+owners:
+  - name: CloudNativePG Maintainers
+    email: info@cloudnative-pg.io

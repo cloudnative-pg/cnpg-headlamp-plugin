@@ -126,7 +126,12 @@ Check out production-ready plugins in `node_modules/@kinvolk/headlamp-plugin/off
 
 ## Development Workflow
 
-1. **Start Development:** Run `npm start` to watch for changes
+> **mise only:** this repo pins its toolchain in `mise.toml` (Node 24).
+> Run every `node` / `npm` / `npx` command via mise, e.g.
+> `mise exec -- npm run build`, `mise exec -- npx tsc --noEmit`.
+> Never invoke `node`, `npm` or `npx` directly.
+
+1. **Start Development:** Run `mise exec -- npm start` to watch for changes
 2. **Make Changes:** Edit files in `src/`
 3. **Type Check:** Run `npm run tsc` to check for TypeScript errors
 4. **Lint:** Run `npm run lint` to check for code quality issues
