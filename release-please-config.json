@@ -5,6 +5,7 @@
   "bump-patch-for-minor-pre-major": true,
   "draft": false,
   "prerelease": false,
+  "include-component-in-tag": false,
   "packages": {
     ".": {
       "release-as": "0.1.1"
