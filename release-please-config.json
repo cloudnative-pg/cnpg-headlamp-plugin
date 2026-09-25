@@ -7,7 +7,7 @@
   "prerelease": false,
   "packages": {
     ".": {
-      "release-as": "0.1.0"
+      "release-as": "0.1.1"
     }
   },
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
