@@ -2,6 +2,8 @@
 
 # CNPG Headlamp Plugin
 
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/cnpg-headlamp-plugin)](https://artifacthub.io/packages/search?repo=cnpg-headlamp-plugin)
+
 A [Headlamp](https://headlamp.dev/) plugin for managing and visualizing [CloudNativePG](https://cloudnative-pg.io/) (CNPG) resources — Clusters, Poolers, Backups, Scheduled Backups, and Database objects — directly from the Headlamp UI.
 
 ## Screenshots
