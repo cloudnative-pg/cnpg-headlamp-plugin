@@ -4,6 +4,21 @@ displayName: CloudNativePG Headlamp Plugin
 createdAt: '2026-09-25T09:27:50Z'
 logoPath: 'logo/cloudnativepg-portrait-blue.svg'
 description: Headlamp plugin for managing CloudNativePG resources - Clusters, Poolers, Backups and Databases - directly from the Headlamp UI.
+screenshots:
+  - title: Operator status page
+    url: https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/operator-status.png
+  - title: Cluster list
+    url: https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/cluster-list.png
+  - title: Cluster detail
+    url: https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/cluster-detail.png
+  - title: Cluster creation form
+    url: https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/cluster-form.png
+  - title: Scheduled backups list
+    url: https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/scheduled-backup-list.png
+  - title: Database detail
+    url: https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/database-detail.png
+  - title: Live metrics
+    url: https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/live-metrics.png
 annotations:
   headlamp/plugin/archive-url: https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases/download/v0.1.1/cnpg-headlamp-plugin-0.1.1.tar.gz
   headlamp/plugin/archive-checksum: SHA256:2edd7c3f319e36aae765b6363064a1956b3ef3aedb18a5c54fec71cd5ad9933c

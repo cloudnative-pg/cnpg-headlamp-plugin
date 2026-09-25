@@ -22,7 +22,7 @@ A [Headlamp](https://headlamp.dev/) plugin for managing and visualizing [CloudNa
     <td><img src="img/database-detail.png" alt="Database detail" width="400"></td>
   </tr>
   <tr>
-    <td><img src="img/live-metrics.png" alt="Scheduled backups list" width="400"></td>
+    <td><img src="img/live-metrics.png" alt="Live metrics" width="400"></td>
   </tr>
  </table>
 
