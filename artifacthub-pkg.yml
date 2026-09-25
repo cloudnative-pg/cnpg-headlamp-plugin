@@ -4,6 +4,24 @@ displayName: CloudNativePG
 createdAt: '2026-09-25T09:27:50Z'
 logoPath: 'logo/cloudnativepg-portrait-blue.svg'
 description: Headlamp plugin for managing CloudNativePG resources - Clusters, Poolers, Backups and Databases - directly from the Headlamp UI.
+license: Apache-2.0
+homeURL: https://cloudnative-pg.io
+keywords:
+  - postgresql
+  - postgres
+  - database
+  - cloudnativepg
+  - kubernetes
+  - headlamp
+  - headlamp-plugin
+links:
+  - name: Source
+    url: https://github.com/cloudnative-pg/cnpg-headlamp-plugin
+  - name: Documentation
+    url: https://cloudnative-pg.io/documentation/
+maintainers:
+  - name: CloudNativePG Maintainers
+    email: info@cloudnative-pg.io
 screenshots:
   - title: Operator status page
     url: https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/operator-status.png

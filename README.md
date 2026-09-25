@@ -1,4 +1,4 @@
-[![CloudNativePG](./logo/cloudnativepg.png)](https://cloudnative-pg.io/)
+[![CloudNativePG](https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/logo/cloudnativepg.png)](https://cloudnative-pg.io/)
 
 # CNPG Headlamp Plugin
 
@@ -6,29 +6,48 @@
 
 A [Headlamp](https://headlamp.dev/) plugin for managing and visualizing [CloudNativePG](https://cloudnative-pg.io/) (CNPG) resources — Clusters, Poolers, Backups, Scheduled Backups, and Database objects — directly from the Headlamp UI.
 
+## Requirements
+
+- Headlamp >= 0.42 (Desktop, in-cluster, web, or Docker Desktop)
+- A Kubernetes cluster with the [CloudNativePG operator](https://cloudnative-pg.io/documentation/current/installation/) installed (the plugin manages CNPG custom resources)
+
+## Installation
+
+### Headlamp Desktop (Plugin Catalog)
+
+1. Open Headlamp and go to the Plugin Catalog
+2. Search for `cnpg-headlamp-plugin` and click **Install**
+3. Reload the UI (via the notification, or Navigation menu > Reload) — a **CloudNativePG** section appears in the sidebar
+
+### Manual install
+
+1. Download the `cnpg-headlamp-plugin-<version>.tar.gz` archive from the [GitHub Releases](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases) page
+2. Install it following the [Headlamp plugin installation documentation](https://headlamp.dev/docs/latest/development/plugins/)
+
 ## Screenshots
 
 <table>
   <tr>
-    <td><img src="img/operator-status.png" alt="Operator status page" width="400"></td>
-    <td><img src="img/cluster-list.png" alt="Cluster list" width="400"></td>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/operator-status.png" alt="Operator status page" width="400"></td>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/cluster-list.png" alt="Cluster list" width="400"></td>
   </tr>
   <tr>
-    <td><img src="img/cluster-detail.png" alt="Cluster detail" width="400"></td>
-    <td><img src="img/cluster-form.png" alt="Cluster creation form" width="400"></td>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/cluster-detail.png" alt="Cluster detail" width="400"></td>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/cluster-form.png" alt="Cluster creation form" width="400"></td>
   </tr>
   <tr>
-    <td><img src="img/scheduled-backup-list.png" alt="Scheduled backups list" width="400"></td>
-    <td><img src="img/database-detail.png" alt="Database detail" width="400"></td>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/scheduled-backup-list.png" alt="Scheduled backups list" width="400"></td>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/database-detail.png" alt="Database detail" width="400"></td>
   </tr>
   <tr>
-    <td><img src="img/live-metrics.png" alt="Live metrics" width="400"></td>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/live-metrics.png" alt="Live metrics" width="400"></td>
+    <td></td>
   </tr>
  </table>
 
 ## Features
 
-#### Clusters
+### Clusters
 
 List and detail views, plus a guided creation form.
 
@@ -36,37 +55,41 @@ List and detail views, plus a guided creation form.
 - Instance roles and synchronous replication warnings
 - Per-instance Postgres logs (filterable, color-coded, live-following)
 - A `psql` terminal against the primary or any replica
-- A **Live Metrics** section on the cluster's detail page, scraped from each instance's CNPG Prometheus exporter (port 9187) via the Kubernetes API's pod proxy subresource, with no `psql` or exec involved. It is organized into collapsible categories: **Replication & Archiving** (primary only: connected standbys, replication lag, inactive slots, WAL archiving failures, backlog and timing, sync replica counts, plus per standby and per slot detail tables), **General Health** and **Checkpointing** (both switchable per instance via a dropdown: connections, cache hit ratio, database size, blocked and long running queries, deadlocks, checkpoint and restartpoint counts), and **Database Health** (transaction ID and multixact age, rollback ratio, temp file spill, and extension updates, per database). A status strip flags fencing, a pending manual switchover, or available extension updates when applicable. Tiles show an (i) icon with a short description and the underlying `cnpg_*` metric name(s), with an optional automatic refresh interval (15s/30s/60s or off, matched to the exporter's own 30 second refresh cadence)
+- A **Live Metrics** section on the cluster's detail page, scraped from each instance's CNPG Prometheus exporter (port 9187) via the Kubernetes API's pod proxy subresource — no `psql` or exec involved. It is organized into collapsible categories:
+  - **Replication & Archiving** (primary only): connected standbys, replication lag, inactive slots, WAL archiving failures, backlog and timing, sync replica counts, plus per-standby and per-slot detail tables
+  - **General Health** and **Checkpointing** (switchable per instance via a dropdown): connections, cache hit ratio, database size, blocked and long running queries, deadlocks, checkpoint and restartpoint counts
+  - **Database Health**: transaction ID and multixact age, rollback ratio, temp file spill, and extension updates, per database
+  - A status strip flags fencing, a pending manual switchover, or available extension updates when applicable. Tiles show an (i) icon with a short description and the underlying `cnpg_*` metric name(s), with an optional automatic refresh interval (15s/30s/60s or off, matched to the exporter's own 30 second refresh cadence)
 - A manual **switchover** action to promote a chosen replica to primary
 - Leader-election **lease** details (holder, acquire/renew time, duration, transitions) alongside the cluster's main info
 - Creation form (with live YAML preview) covering instances/HA, storage and tablespaces, backup configuration, volume snapshots, and bootstrap — including bootstrapping a new cluster from an existing backup
 
-#### Poolers (PgBouncer)
+### Poolers (PgBouncer)
 
 List/detail views and a guided creation form.
 
-#### Backups
+### Backups
 
 On-demand backups with status tracking, created against the Barman Cloud plugin or via volume snapshots (not the deprecated in-tree `barmanObjectStore`).
 
-#### Scheduled Backups
+### Scheduled Backups
 
 - Graphical cron editor (Daily/Weekly/Monthly, plus a raw-text advanced mode) with a humanized schedule description
 - A "trigger now" action
 
-#### Object Stores
+### Object Stores
 
 Manage the `ObjectStore` CRs backing the Barman Cloud plugin, with a "referring clusters" section showing which clusters use each store for backup and/or recovery.
 
-#### Database objects
+### Database objects
 
 List/detail/create views for `Database`, `DatabaseRole`, `Publication`, and `Subscription`, each showing reconciliation status.
 
-#### Image Catalogs / Cluster Image Catalogs
+### Image Catalogs / Cluster Image Catalogs
 
 List and detail views for managing available Postgres operand images.
 
-#### Operator status page
+### Operator status page
 
 - Installed CNPG CRDs and operator pod health
 - Detected CNPG-i plugins (e.g. Barman Cloud), with quick access to their logs
