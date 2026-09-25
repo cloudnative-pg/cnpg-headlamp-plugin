@@ -3,7 +3,8 @@ name: Release CNPG Headlamp Plugin
 on:
   # Automatic path: release-please publishes a GitHub release with tag vX.Y.Z,
   # this workflow builds the plugin tarball, attaches it to that release,
-  # and updates artifacthub-pkg.yml on main so ArtifactHub picks it up.
+  # and opens a PR updating artifacthub-pkg.yml on main (direct pushes to
+  # main are blocked by branch protection) so ArtifactHub picks it up.
   release:
     types: [published]
   # Manual path: retry a failed run (or cut a release without release-please)
@@ -21,6 +22,7 @@ jobs:
     name: Release CNPG Headlamp Plugin
     permissions:
       contents: write
+      pull-requests: write
     runs-on: ubuntu-latest
 
     steps:
@@ -91,15 +93,6 @@ jobs:
             }
           commitChange: false
 
-      - name: Commit release metadata to main
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add artifacthub-pkg.yml package.json
-          git diff --staged --quiet && echo "nothing to commit" && exit 0
-          git commit -m "chore: release ${{ steps.version.outputs.tag }}"
-          git push origin main
-
       - name: Attach tarball to GitHub release
         uses: softprops/action-gh-release@v3
         with:
@@ -109,3 +102,24 @@ jobs:
           fail_on_unmatched_files: true
           files: ${{ steps.version.outputs.tarball }}
           token: ${{ github.token }}
+
+      # main is protected against direct pushes, so the metadata update goes
+      # through a PR. REPO_PAT (instead of GITHUB_TOKEN) is used so that CI
+      # workflows trigger on the PR and required checks can pass.
+      - name: Open PR with release metadata
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.REPO_PAT }}
+          branch: chore/release-${{ steps.version.outputs.tag }}-metadata
+          delete-branch: true
+          add-paths: |
+            artifacthub-pkg.yml
+            package.json
+          signoff: true
+          commit-message: 'chore: release ${{ steps.version.outputs.tag }}'
+          title: 'chore: release ${{ steps.version.outputs.tag }}'
+          body: |
+            Automated release metadata for ${{ steps.version.outputs.tag }}:
+            points `artifacthub-pkg.yml` at the published plugin tarball
+            (URL + SHA256 checksum) so ArtifactHub picks up the new version.
+            Merging this PR completes the release.
