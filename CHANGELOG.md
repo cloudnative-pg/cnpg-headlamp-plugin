@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/compare/v0.1.1...v0.1.2) (2026-09-25)
+
+
+### Bug Fixes
+
+* improve README ([#61](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/issues/61)) ([4e0b3fa](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/commit/4e0b3faa94cf6583486b083e663f8d774e98d1ca))
+* remove release please explicit version ([#63](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/issues/63)) ([50e1561](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/commit/50e1561d82df79cd71c5149907f0c77388b4afa6))
+
 ## [0.1.1](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/compare/v0.1.1...v0.1.1) (2026-09-25)
 
 
