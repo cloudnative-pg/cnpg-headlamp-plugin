@@ -35,7 +35,7 @@
   },
   "overrides": {
     "typescript": "5.9.3",
-    "vitest": "4.1.11"
+    "vitest": "5.0.2"
   },
   "devDependencies": {
     "@kinvolk/headlamp-plugin": "^0.14.0"
