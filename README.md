@@ -6,24 +6,6 @@
 
 A [Headlamp](https://headlamp.dev/) plugin for managing and visualizing [CloudNativePG](https://cloudnative-pg.io/) (CNPG) resources — Clusters, Poolers, Backups, Scheduled Backups, and Database objects — directly from the Headlamp UI.
 
-## Requirements
-
-- Headlamp >= 0.42 (Desktop, in-cluster, web, or Docker Desktop)
-- A Kubernetes cluster with the [CloudNativePG operator](https://cloudnative-pg.io/documentation/current/installation/) installed (the plugin manages CNPG custom resources)
-
-## Installation
-
-### Headlamp Desktop (Plugin Catalog)
-
-1. Open Headlamp and go to the Plugin Catalog
-2. Search for `cnpg-headlamp-plugin` and click **Install**
-3. Reload the UI (via the notification, or Navigation menu > Reload) — a **CloudNativePG** section appears in the sidebar
-
-### Manual install
-
-1. Download the `cnpg-headlamp-plugin-<version>.tar.gz` archive from the [GitHub Releases](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases) page
-2. Install it following the [Headlamp plugin installation documentation](https://headlamp.dev/docs/latest/development/plugins/)
-
 ## Screenshots
 
 <table>
@@ -44,6 +26,24 @@ A [Headlamp](https://headlamp.dev/) plugin for managing and visualizing [CloudNa
     <td></td>
   </tr>
  </table>
+
+## Requirements
+
+- Headlamp >= 0.42 (Desktop, in-cluster, web, or Docker Desktop)
+- A Kubernetes cluster with the [CloudNativePG operator](https://cloudnative-pg.io/documentation/current/installation/) installed (the plugin manages CNPG custom resources)
+
+## Installation
+
+### Headlamp Desktop (Plugin Catalog)
+
+1. Open Headlamp and go to the Plugin Catalog
+2. Search for `cnpg-headlamp-plugin` and click **Install**
+3. Reload the UI (via the notification, or Navigation menu > Reload) — a **CloudNativePG** section appears in the sidebar
+
+### Manual install
+
+1. Download the `cnpg-headlamp-plugin-<version>.tar.gz` archive from the [GitHub Releases](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases) page
+2. Install it following the [Headlamp plugin installation documentation](https://headlamp.dev/docs/latest/development/plugins/)
 
 ## Features
 
