@@ -21,7 +21,11 @@ export function ClusterImageCatalogsList() {
             authVerb="create"
             deniedMessage="You don't have permission to create ClusterImageCatalogs."
           >
-            <Button variant="contained" color="primary" onClick={() => launchClusterImageCatalogCreate()}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => launchClusterImageCatalogCreate()}
+            >
               Create ClusterImageCatalog
             </Button>
           </AuthDisabledButton>,

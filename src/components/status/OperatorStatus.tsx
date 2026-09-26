@@ -170,11 +170,13 @@ function PluginsSection() {
   return (
     <SectionBox title="CNPG-i Plugins">
       {hasPlugins ? (
-        (services ?? []).map(service => <PluginPodsSection key={service.metadata.uid} service={service} />)
+        (services ?? []).map(service => (
+          <PluginPodsSection key={service.metadata.uid} service={service} />
+        ))
       ) : (
         <StatusLabel status="">
-          No Service carrying a cnpg.io/pluginName label was found — no CNPG-i plugins (e.g.
-          Barman Cloud) appear to be installed.
+          No Service carrying a cnpg.io/pluginName label was found — no CNPG-i plugins (e.g. Barman
+          Cloud) appear to be installed.
         </StatusLabel>
       )}
     </SectionBox>

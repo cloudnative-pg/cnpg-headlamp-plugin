@@ -1,9 +1,5 @@
 import { K8s, Router } from '@kinvolk/headlamp-plugin/lib';
-import {
-  ActionButton,
-  LogViewer,
-  SectionBox,
-} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import { ActionButton, LogViewer, SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Box from '@mui/material/Box';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';

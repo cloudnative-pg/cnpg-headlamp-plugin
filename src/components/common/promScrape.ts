@@ -100,7 +100,9 @@ export function metricByLabel(
   labelKey: string,
   labelValue: string
 ): number {
-  return samplesFor(series, name).find(sample => sample.labels[labelKey] === labelValue)?.value ?? 0;
+  return (
+    samplesFor(series, name).find(sample => sample.labels[labelKey] === labelValue)?.value ?? 0
+  );
 }
 
 // cnpg_pg_extensions_update_available carries multiple extname rows per datname, so it can't
@@ -173,11 +175,14 @@ export function usePodMetrics(pod: Pod | null, refreshIntervalSeconds = 0): PodM
     function run() {
       setResult(previous => ({ ...previous, loading: true }));
 
-      ApiProxy.request(`/api/v1/namespaces/${pod!.getNamespace()}/pods/${pod!.getName()}:9187/proxy/metrics`, {
-        method: 'GET',
-        isJSON: false,
-        cluster: pod!.cluster,
-      })
+      ApiProxy.request(
+        `/api/v1/namespaces/${pod!.getNamespace()}/pods/${pod!.getName()}:9187/proxy/metrics`,
+        {
+          method: 'GET',
+          isJSON: false,
+          cluster: pod!.cluster,
+        }
+      )
         .then((response: Response) => {
           if (stopped) {
             return;

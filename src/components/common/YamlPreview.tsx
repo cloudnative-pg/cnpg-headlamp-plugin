@@ -25,7 +25,11 @@ interface YamlPreviewProps {
 // into a free-form editor for the rare case the form doesn't cover, at the cost of no longer
 // reflecting further form changes while it's on (same tradeoff a raw kubectl edit would have).
 // Uses the same Monaco editor Headlamp's own YAML dialogs use.
-export function YamlPreview({ manifest, title = 'Review YAML', onOverrideChange }: YamlPreviewProps) {
+export function YamlPreview({
+  manifest,
+  title = 'Review YAML',
+  onOverrideChange,
+}: YamlPreviewProps) {
   const theme = useTheme();
   const formYaml = useMemo(() => dump(manifest), [manifest]);
   const [editing, setEditing] = useState(false);
@@ -84,7 +88,11 @@ export function YamlPreview({ manifest, title = 'Review YAML', onOverrideChange 
       </AccordionSummary>
       <AccordionDetails sx={{ p: 0 }}>
         {editing && (
-          <Typography variant="caption" color={parseError ? 'error' : 'text.secondary'} sx={{ display: 'block', p: 1 }}>
+          <Typography
+            variant="caption"
+            color={parseError ? 'error' : 'text.secondary'}
+            sx={{ display: 'block', p: 1 }}
+          >
             {parseError
               ? `${parseError} — the last valid version below will be submitted instead.`
               : 'Editing overrides the form above — further form changes will be ignored.'}
