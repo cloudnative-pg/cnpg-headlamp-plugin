@@ -21,6 +21,7 @@ import { ClusterImageCatalogDetail } from './components/clusterimagecatalogs/Det
 import { ClusterImageCatalogsList } from './components/clusterimagecatalogs/List';
 import { ClusterDetail } from './components/clusters/Detail';
 import { ClustersList } from './components/clusters/List';
+import { setupCnpgMenuIcon } from './components/common/cnpgMenuIcon';
 import { PodLogsPage } from './components/common/podLogs';
 import { PodTerminalPage } from './components/common/podTerminal';
 import { DatabaseRoleDetail } from './components/databaseroles/Detail';
@@ -51,7 +52,9 @@ registerSidebarEntry({
   // Points at the operator/plugin status overview rather than straight at the cluster list, so
   // clicking the top-level sidebar entry answers "is CNPG even installed correctly?" first.
   url: '/cnpg/status',
-  icon: 'mdi:database',
+  // Brand mark registered with Iconify in components/common/cnpgMenuIcon.ts (Headlamp only
+  // renders sidebar icons through Iconify strings, so the SVG can't be passed directly).
+  icon: setupCnpgMenuIcon(),
   parent: '',
   label: 'CloudNativePG',
 });
