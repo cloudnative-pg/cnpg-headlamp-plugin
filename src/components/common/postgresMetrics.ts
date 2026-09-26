@@ -73,12 +73,12 @@ export const POSTGRES_METRICS: Record<string, PostgresMetric> = {
       'How many synchronous standbys are currently connected, compared to how many synchronous_standby_names requires.',
     metricNames: ['cnpg_collector_sync_replicas'],
     compute: series =>
-      `${metricByLabel(series, 'cnpg_collector_sync_replicas', 'value', 'observed')}/${metricByLabel(
+      `${metricByLabel(
         series,
         'cnpg_collector_sync_replicas',
         'value',
-        'expected'
-      )}`,
+        'observed'
+      )}/${metricByLabel(series, 'cnpg_collector_sync_replicas', 'value', 'expected')}`,
   },
   walBacklog: {
     label: 'WAL Segments Awaiting Archiving',

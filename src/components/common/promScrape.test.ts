@@ -146,16 +146,16 @@ describe('countMetricWhere', () => {
         'cnpg_pg_replication_slots_active{slot_name="c"} 0',
       ].join('\n')
     );
-    expect(
-      countMetricWhere(series, 'cnpg_pg_replication_slots_active', value => value === 0)
-    ).toBe(2);
+    expect(countMetricWhere(series, 'cnpg_pg_replication_slots_active', value => value === 0)).toBe(
+      2
+    );
   });
 
   test('returns 0 when no sample matches', () => {
     const series = parsePrometheusText('cnpg_pg_replication_slots_active{slot_name="a"} 1');
-    expect(
-      countMetricWhere(series, 'cnpg_pg_replication_slots_active', value => value === 0)
-    ).toBe(0);
+    expect(countMetricWhere(series, 'cnpg_pg_replication_slots_active', value => value === 0)).toBe(
+      0
+    );
   });
 });
 

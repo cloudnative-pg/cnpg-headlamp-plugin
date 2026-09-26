@@ -1,9 +1,5 @@
 import { K8s, Router } from '@kinvolk/headlamp-plugin/lib';
-import {
-  ActionButton,
-  SectionBox,
-  Terminal,
-} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import { ActionButton, SectionBox, Terminal } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Box from '@mui/material/Box';
 import { useHistory, useParams } from 'react-router-dom';
 import { Pod } from './podActions';
