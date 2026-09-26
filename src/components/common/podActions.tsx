@@ -43,8 +43,8 @@ export function PodStatusLabel({
     phase === 'Failed'
       ? 'error'
       : phase === 'Succeeded' || (phase === 'Running' && isReady)
-        ? 'success'
-        : 'warning';
+      ? 'success'
+      : 'warning';
 
   const containerStatuses = pod.status.containerStatuses ?? [];
 
@@ -62,7 +62,9 @@ export function PodStatusLabel({
               tooltip = `${containerStatus.name}: waiting (${state.waiting.reason ?? 'unknown'})`;
             } else if (state.terminated) {
               color = state.terminated.reason === 'Error' ? 'red' : 'green';
-              tooltip = `${containerStatus.name}: terminated (${state.terminated.reason ?? 'unknown'})`;
+              tooltip = `${containerStatus.name}: terminated (${
+                state.terminated.reason ?? 'unknown'
+              })`;
             } else if (state.running) {
               color = 'green';
               tooltip = `${containerStatus.name}: running`;
