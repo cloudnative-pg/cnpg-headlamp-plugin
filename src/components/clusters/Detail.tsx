@@ -221,7 +221,16 @@ function InfoTable({ rows }: { rows: { name: ReactNode; value: ReactNode }[] }) 
 }
 
 function CnpgLogo({ size = 18 }: { size?: number }) {
+  const theme = useTheme();
   const gradientId = useId();
+  // The brand artwork ends in dark navy (#121646), which disappears on Headlamp's dark
+  // background — so in dark mode the ink and the dark end of the gradient switch to light
+  // tones while the purple head stays untouched.
+  const dark = theme.palette.mode === 'dark';
+  const ink = dark ? '#e8eaf6' : '#121646';
+  const stops = dark
+    ? ['#a678ff', '#9a6bf0', '#8a5cf0', '#7c6cf0', '#aab0e0', '#c5cae9']
+    : ['#732dd9', '#692aca', '#5024a5', '#291b69', '#121646', '#121646'];
   return (
     <svg
       width={size}
@@ -241,14 +250,14 @@ function CnpgLogo({ size = 18 }: { size?: number }) {
           fy="-504.64"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0" stopColor="#732dd9" />
-          <stop offset=".12" stopColor="#692aca" />
-          <stop offset=".34" stopColor="#5024a5" />
-          <stop offset=".65" stopColor="#291b69" />
-          <stop offset=".81" stopColor="#121646" />
-          <stop offset="1" stopColor="#121646" />
+          <stop offset="0" stopColor={stops[0]} />
+          <stop offset=".12" stopColor={stops[1]} />
+          <stop offset=".34" stopColor={stops[2]} />
+          <stop offset=".65" stopColor={stops[3]} />
+          <stop offset=".81" stopColor={stops[4]} />
+          <stop offset="1" stopColor={stops[5]} />
         </radialGradient>
-        <style>{`.cnpg-logo-fill{fill:url(#${gradientId})}.cnpg-logo-dark{fill:#121646}`}</style>
+        <style>{`.cnpg-logo-fill{fill:url(#${gradientId})}.cnpg-logo-dark{fill:${ink}}`}</style>
       </defs>
       <path
         d="M828.43 842.64c-6.98-16.97-12.13-34.74-17.36-52.38-5.96-20.09-10.89-40.48-16.78-60.59-1.74-5.92-4.69-11.68-8.08-16.86-3.38-5.16-6.87-4.38-8.66 1.45-4.79 15.63-8.88 31.49-14.23 46.92-9.66 27.84-22.83 53.75-40.86 77.44-8.99 11.82-19.06 22.78-29.47 33.35-5.21 5.29-10.51 10.49-15.82 15.68-4.65 4.54-9.53 9.3-6.24 16.19 2.55 5.35 8.22 5.85 13.47 5.83.76 0 1.51-.02 2.24-.03 26.88-.45 53.76.29 80.64.6 18.77.21 37.55.98 56.3.56 7.91-.18 16.6.08 23.04-6.41 7.23-7.29 8.41-12.84 3.19-21.74-7.65-13.04-15.65-26.09-21.37-40z"
@@ -329,6 +338,40 @@ function StatCard({
   );
 }
 
+// Green check / red cross used for health-style statuses. Headlamp's own success.main is
+// near-white and error.main near-black-red in dark mode, so both would be unreadable there —
+// these explicit tones stay legible on light and dark backgrounds alike.
+function HealthStatusIcon({
+  healthy,
+  size = 20,
+  title,
+}: {
+  healthy: boolean;
+  size?: number;
+  title: string;
+}) {
+  return (
+    <Tooltip title={title}>
+      <Box
+        component="span"
+        sx={{
+          display: 'inline-flex',
+          color: theme =>
+            healthy
+              ? theme.palette.mode === 'dark'
+                ? '#66bb6a'
+                : '#2e7d32'
+              : theme.palette.mode === 'dark'
+              ? '#ef5350'
+              : '#c62828',
+        }}
+      >
+        <Icon icon={healthy ? 'mdi:check-circle' : 'mdi:close-circle'} width={size} height={size} />
+      </Box>
+    </Tooltip>
+  );
+}
+
 function SummaryStrip({ cluster }: { cluster: Cluster }) {
   const [pvcs] = K8s.ResourceClasses.PersistentVolumeClaim.useList({
     namespace: cluster.getNamespace(),
@@ -367,20 +410,11 @@ function SummaryStrip({ cluster }: { cluster: Cluster }) {
           icon={<Icon icon="mdi:hexagon-multiple-outline" width={18} height={18} />}
           title="Health"
           value={
-            <Tooltip title={cluster.healthLabel}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  color: cluster.health === 'success' ? 'success.main' : 'error.main',
-                }}
-              >
-                <Icon
-                  icon={cluster.health === 'success' ? 'mdi:check-circle' : 'mdi:close-circle'}
-                  width={22}
-                  height={22}
-                />
-              </Box>
-            </Tooltip>
+            <HealthStatusIcon
+              healthy={cluster.health === 'success'}
+              size={22}
+              title={cluster.healthLabel}
+            />
           }
         />
       </Grid>
@@ -430,10 +464,12 @@ function InstanceNode({ pod, emphasis }: { pod: Pod; emphasis: 'primary' | 'stan
         minWidth: 140,
         maxWidth: 220,
         flex: 1,
-        bgcolor: theme =>
-          emphasis === 'primary'
-            ? alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.16 : 0.1)
-            : alpha(theme.palette.grey[500], theme.palette.mode === 'dark' ? 0.18 : 0.12),
+        bgcolor: theme => {
+          const green = theme.palette.mode === 'dark' ? '#66bb6a' : '#2e7d32';
+          return emphasis === 'primary'
+            ? alpha(green, theme.palette.mode === 'dark' ? 0.16 : 0.1)
+            : alpha(theme.palette.grey[500], theme.palette.mode === 'dark' ? 0.18 : 0.12);
+        },
         textAlign: 'center',
       }}
     >
@@ -457,7 +493,8 @@ function InstanceNode({ pod, emphasis }: { pod: Pod; emphasis: 'primary' | 'stan
             width: 8,
             height: 8,
             borderRadius: '50%',
-            bgcolor: isReady ? 'success.main' : 'warning.main',
+            bgcolor: theme =>
+              isReady ? (theme.palette.mode === 'dark' ? '#66bb6a' : '#2e7d32') : 'warning.main',
           }}
         />
         <Typography variant="caption" color="text.secondary">
@@ -868,23 +905,13 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
           headerStyle="subsection"
           title={
             <>
-              <Tooltip title={cluster.healthLabel}>
-                <Box
-                  component="span"
-                  sx={{
-                    display: 'inline-flex',
-                    verticalAlign: 'middle',
-                    mr: 1,
-                    color: cluster.health === 'success' ? 'success.main' : 'error.main',
-                  }}
-                >
-                  <Icon
-                    icon={cluster.health === 'success' ? 'mdi:check-circle' : 'mdi:close-circle'}
-                    width={20}
-                    height={20}
-                  />
-                </Box>
-              </Tooltip>
+              <Box component="span" sx={{ display: 'inline-flex', verticalAlign: 'middle', mr: 1 }}>
+                <HealthStatusIcon
+                  healthy={cluster.health === 'success'}
+                  size={20}
+                  title={cluster.healthLabel}
+                />
+              </Box>
               Backup Status
             </>
           }
@@ -2055,29 +2082,15 @@ export function ClusterDetail() {
             label={
               <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
                 {cluster.isLastBackupSucceeded !== undefined && (
-                  <Tooltip
+                  <HealthStatusIcon
+                    healthy={cluster.isLastBackupSucceeded}
+                    size={16}
                     title={
                       cluster.isLastBackupSucceeded
                         ? 'Last backup succeeded'
                         : 'Last backup did not succeed'
                     }
-                  >
-                    <Box
-                      component="span"
-                      sx={{
-                        display: 'inline-flex',
-                        color: cluster.isLastBackupSucceeded ? 'success.main' : 'error.main',
-                      }}
-                    >
-                      <Icon
-                        icon={
-                          cluster.isLastBackupSucceeded ? 'mdi:check-circle' : 'mdi:close-circle'
-                        }
-                        width={16}
-                        height={16}
-                      />
-                    </Box>
-                  </Tooltip>
+                  />
                 )}
                 Backups
               </Box>
