@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { appliedSeverity, backupPhaseSeverity } from './status';
+import {
+  appliedSeverity,
+  backupPhaseSeverity,
+  getImageVersion,
+  humanizePluginName,
+  KNOWN_PLUGIN_CAPABILITIES,
+} from './status';
 
 describe('backupPhaseSeverity', () => {
   it('marks a completed backup as success', () => {
@@ -37,5 +43,38 @@ describe('appliedSeverity', () => {
   // must not be conflated with `false`, which means the operator tried and failed.
   it('treats an unreconciled object as neutral, not failed', () => {
     expect(appliedSeverity(undefined)).toBe('');
+  });
+});
+
+describe('getImageVersion', () => {
+  it('extracts the tag from a fully-qualified image', () => {
+    expect(getImageVersion('ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0')).toBe('1.30.0');
+  });
+
+  it('falls back to a placeholder for a missing image', () => {
+    expect(getImageVersion(undefined)).toBe('-');
+  });
+
+  it('falls back to the full image string when there is no tag', () => {
+    expect(getImageVersion('postgres')).toBe('postgres');
+  });
+});
+
+describe('humanizePluginName', () => {
+  it('uses the display name of well-known plugins', () => {
+    expect(humanizePluginName('barman-cloud.cloudnative-pg.io')).toBe('Barman Cloud');
+  });
+
+  it('prettifies unknown plugin IDs from the part before the first dot', () => {
+    expect(humanizePluginName('my-plugin.example.io')).toBe('My Plugin');
+  });
+
+  it('documents capabilities only for plugins whose behavior is known', () => {
+    expect(KNOWN_PLUGIN_CAPABILITIES['barman-cloud.cloudnative-pg.io']).toEqual([
+      'Backup',
+      'WAL archiving',
+      'Restore',
+    ]);
+    expect(KNOWN_PLUGIN_CAPABILITIES['my-plugin.example.io']).toBeUndefined();
   });
 });

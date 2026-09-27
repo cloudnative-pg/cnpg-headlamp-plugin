@@ -1,7 +1,7 @@
 import { addIcon } from '@iconify/react';
 
 // Brand artwork shared with the cluster detail header (see CnpgLogo in
-// components/clusters/Detail.tsx) — the two path constants below are copied verbatim from there.
+// components/common/CnpgLogo.tsx) — the two path constants below are copied verbatim from there.
 const PATH_A =
   'M828.43 842.64c-6.98-16.97-12.13-34.74-17.36-52.38-5.96-20.09-10.89-40.48-16.78-60.59-1.74-5.92-4.69-11.68-8.08-16.86-3.38-5.16-6.87-4.38-8.66 1.45-4.79 15.63-8.88 31.49-14.23 46.92-9.66 27.84-22.83 53.75-40.86 77.44-8.99 11.82-19.06 22.78-29.47 33.35-5.21 5.29-10.51 10.49-15.82 15.68-4.65 4.54-9.53 9.3-6.24 16.19 2.55 5.35 8.22 5.85 13.47 5.83.76 0 1.51-.02 2.24-.03 26.88-.45 53.76.29 80.64.6 18.77.21 37.55.98 56.3.56 7.91-.18 16.6.08 23.04-6.41 7.23-7.29 8.41-12.84 3.19-21.74-7.65-13.04-15.65-26.09-21.37-40z';
 const PATH_B =
