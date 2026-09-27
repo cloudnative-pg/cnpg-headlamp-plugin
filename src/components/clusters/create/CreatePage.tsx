@@ -15,7 +15,7 @@ import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useHistory } from 'react-router-dom';
+import { useHistory, useLocation } from 'react-router-dom';
 import { Cluster } from '../../../resources/cluster';
 import { ClusterImageCatalog, ImageCatalog } from '../../../resources/imageCatalog';
 import { ObjectStore } from '../../../resources/objectStore';
@@ -923,8 +923,17 @@ function BackupTab({ state, update, newRowId }: TabProps) {
 
 export function CreateClusterPage() {
   const history = useHistory();
+  const location = useLocation();
   const [tab, setTab] = useState<CreateTab>('general');
-  const [state, setState] = useState<ClusterCreateFormState>(defaultFormState);
+  const [state, setState] = useState<ClusterCreateFormState>(() => {
+    const initial = defaultFormState();
+    // ?start=recovery (linked from the list page's "Restore" action) lands directly on the
+    // barman-guided recovery start option instead of an empty initdb cluster.
+    if (new URLSearchParams(location.search).get('start') === 'recovery') {
+      initial.startOption = 'barman-recovery';
+    }
+    return initial;
+  });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [manifestOverride, setManifestOverride] = useState<object | null>(null);
@@ -1171,6 +1180,7 @@ export function CreateClusterPage() {
   );
 }
 
-export function getClusterCreateUrl(): string {
-  return createRouteURL('CNPG Cluster New');
+export function getClusterCreateUrl(opts?: { start?: 'recovery' }): string {
+  const base = createRouteURL('CNPG Cluster New');
+  return opts?.start === 'recovery' ? `${base}?start=recovery` : base;
 }
