@@ -18,6 +18,8 @@ interface YamlPreviewProps {
    *  value instead of `manifest` whenever it isn't `null` — that's what makes the edit an
    *  override rather than something this component can apply back onto the form by itself. */
   onOverrideChange?: (override: object | null) => void;
+  /** Start with the accordion expanded instead of collapsed. */
+  defaultExpanded?: boolean;
 }
 
 // A collapsed-by-default, syntax-highlighted preview of the manifest a Create form is about to
@@ -29,6 +31,7 @@ export function YamlPreview({
   manifest,
   title = 'Review YAML',
   onOverrideChange,
+  defaultExpanded = false,
 }: YamlPreviewProps) {
   const theme = useTheme();
   const formYaml = useMemo(() => dump(manifest), [manifest]);
@@ -66,7 +69,7 @@ export function YamlPreview({
   }
 
   return (
-    <Accordion sx={{ mt: 2 }}>
+    <Accordion sx={{ mt: 2 }} defaultExpanded={defaultExpanded}>
       <AccordionSummary expandIcon={<Icon icon="mdi:chevron-down" />}>
         <Typography sx={{ flexGrow: 1, alignSelf: 'center' }}>{title}</Typography>
         {!!onOverrideChange && (

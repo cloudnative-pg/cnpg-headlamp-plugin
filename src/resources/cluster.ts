@@ -68,6 +68,7 @@ export interface CnpgCluster extends KubeObjectInterface {
     maxSyncReplicas?: number;
     postgresql?: {
       synchronous?: SynchronousReplicaConfiguration;
+      parameters?: Record<string, string>;
     };
     storage?: StorageConfiguration;
     walStorage?: StorageConfiguration;

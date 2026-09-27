@@ -1,11 +1,13 @@
-import { K8s } from '@kinvolk/headlamp-plugin/lib';
+import { K8s, Router } from '@kinvolk/headlamp-plugin/lib';
 import { ResourceListView, StatusLabel } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import { useHistory } from 'react-router-dom';
 import { Cluster } from '../../resources/cluster';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
 import { PodStatusLabel } from '../common/podActions';
-import { launchClusterCreate } from './Create';
+
+const { createRouteURL } = Router;
 
 // One compact status pill per instance pod, same renderer used in the Cluster detail page's
 // Instances section (see PodStatusLabel in common/podActions.tsx for why it isn't a direct import
@@ -28,6 +30,7 @@ function InstanceStatusPills({ cluster }: { cluster: Cluster }) {
 }
 
 export function ClustersList() {
+  const history = useHistory();
   return (
     <ResourceListView
       title="Clusters"
@@ -44,7 +47,11 @@ export function ClustersList() {
             authVerb="create"
             deniedMessage="You don't have permission to create Clusters."
           >
-            <Button variant="contained" color="primary" onClick={() => launchClusterCreate()}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => history.push(createRouteURL('CNPG Cluster New'))}
+            >
               Create / Restore Cluster
             </Button>
           </AuthDisabledButton>,

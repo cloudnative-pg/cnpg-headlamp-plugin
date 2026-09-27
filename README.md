@@ -43,7 +43,7 @@ List and detail views, plus a guided creation form.
   - A status strip flags fencing, a pending manual switchover, or available extension updates when applicable. Tiles show an (i) icon with a short description and the underlying `cnpg_*` metric name(s), with an optional automatic refresh interval (15s/30s/60s or off, matched to the exporter's own 30 second refresh cadence)
 - A manual **switchover** action to promote a chosen replica to primary
 - Leader-election **lease** details (holder, acquire/renew time, duration, transitions) alongside the cluster's main info
-- Creation form (with live YAML preview) covering instances/HA, storage and tablespaces, backup configuration, volume snapshots, and bootstrap — including bootstrapping a new cluster from an existing backup
+- Tabbed creation page (General, PostgreSQL, High Availability, Storage, Backup, YAML preview) with a configuration summary rail, on-demand dry-run validation, custom CNPG-I backup/recovery plugins, and GUC presets — including bootstrapping a new cluster from an existing backup
 
 ### Poolers (PgBouncer)
 

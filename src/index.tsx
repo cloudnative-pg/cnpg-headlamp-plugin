@@ -19,6 +19,7 @@ import { BackupDetail } from './components/backups/Detail';
 import { BackupsList } from './components/backups/List';
 import { ClusterImageCatalogDetail } from './components/clusterimagecatalogs/Detail';
 import { ClusterImageCatalogsList } from './components/clusterimagecatalogs/List';
+import { CreateClusterPage } from './components/clusters/create/CreatePage';
 import { ClusterDetail } from './components/clusters/Detail';
 import { ClustersList } from './components/clusters/List';
 import { setupCnpgMenuIcon } from './components/common/cnpgMenuIcon';
@@ -194,6 +195,14 @@ registerRoute({
   // below, so this list keeps rendering instead of yielding to the detail route.
   exact: true,
   component: () => <ClustersList />,
+});
+
+registerRoute({
+  path: '/cnpg/clusters/new',
+  sidebar: 'cnpg-clusters',
+  name: 'CNPG Cluster New',
+  exact: true,
+  component: () => <CreateClusterPage />,
 });
 
 registerRoute({
