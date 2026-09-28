@@ -284,7 +284,7 @@ function GeneralTab({
             <InstanceDiagram kind="ha" />
             <strong>3 — Production HA</strong>
             <Typography variant="caption" color="text.secondary">
-              Primary + 2 sync standbys, auto-failover
+              Primary + 2 standbys, auto-failover
             </Typography>
           </Button>
           <Button
@@ -548,10 +548,11 @@ function PostgresTab({ state, update, newRowId }: TabProps) {
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <TextField
             margin="normal"
-            label="work_mem"
-            placeholder="e.g. 8MB"
-            value={state.paramWorkMem}
-            onChange={e => update({ paramWorkMem: e.target.value })}
+            label="max_wal_size"
+            placeholder="e.g. 1GB"
+            helperText="Default 1GB. Increase on write-heavy workloads to checkpoint less often."
+            value={state.paramMaxWalSize}
+            onChange={e => update({ paramMaxWalSize: e.target.value })}
             sx={{ flex: 1, minWidth: 200 }}
           />
           <TextField
@@ -1112,7 +1113,7 @@ export function CreateClusterPage() {
             ))}
           </Box>
           {paramsEmpty && (
-            <Alert severity="warning" sx={{ mt: 2 }}>
+            <Alert severity="info" sx={{ mt: 2 }}>
               No PostgreSQL parameters set — operator defaults will apply.
             </Alert>
           )}

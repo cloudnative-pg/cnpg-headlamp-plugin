@@ -48,7 +48,7 @@ export interface ClusterCreateFormState {
   // Parameter presets + free-form extras; empties are stripped before submit.
   paramMaxConnections: string;
   paramSharedBuffers: string;
-  paramWorkMem: string;
+  paramMaxWalSize: string;
   paramCheckpointTimeout: string;
   extraParams: KVRow[];
   // Synchronous replication. Off (or a single instance) omits spec.postgresql.synchronous.
@@ -91,7 +91,7 @@ export function defaultFormState(): ClusterCreateFormState {
     imageCatalogMajor: '',
     paramMaxConnections: '',
     paramSharedBuffers: '',
-    paramWorkMem: '',
+    paramMaxWalSize: '',
     paramCheckpointTimeout: '',
     extraParams: [],
     syncEnabled: true,
@@ -133,7 +133,7 @@ export function collectParameters(state: ClusterCreateFormState): Record<string,
   const presets: [string, string][] = [
     ['max_connections', state.paramMaxConnections.trim()],
     ['shared_buffers', state.paramSharedBuffers.trim()],
-    ['work_mem', state.paramWorkMem.trim()],
+    ['max_wal_size', state.paramMaxWalSize.trim()],
     ['checkpoint_timeout', state.paramCheckpointTimeout.trim()],
   ];
   for (const [key, value] of presets) {
