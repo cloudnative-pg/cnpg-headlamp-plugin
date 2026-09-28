@@ -60,9 +60,6 @@ namespace once per cluster, then capture:
 # once per cluster (needs kubectl pointed at the cluster Headlamp shows)
 ./screenshots/seed-demo.sh --wait
 
-# wait until the demo instances are Running for live-metrics.png:
-# kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=demo-pg -n cnpg-demo --timeout=600s
-
 # each capture run:
 mise exec -- npm start                      # watch build, deploys into Headlamp
 
@@ -73,11 +70,9 @@ mise exec -- npm start                      # watch build, deploys into Headlamp
 
 mise exec -- npm run screenshots             # writes img/*.png (1440x900 @2x)
 # single shot while iterating:
-# mise exec -- node scripts/cdp-screenshots.mjs my-cluster --only=cluster-detail,live-metrics
+# mise exec -- node scripts/cdp-screenshots.mjs my-cluster --only=cluster-detail
 ```
 
 Notes: the script reuses the `cdp-verify.mjs` CDP setup (no new dependencies) and
 prefers the demo objects (`cnpg-demo/demo-pg`, `cnpg-demo/demo-db`) so shots are
-stable; without them it falls back to the first row in each list. `live-metrics`
-is scraped live from the instances' `:9187` exporter, so it needs Running pods
-and varies run to run — re-shoot just that one with `--only=live-metrics`.
+stable; without them it falls back to the first row in each list.

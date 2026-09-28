@@ -35,8 +35,6 @@ screenshots:
     url: https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/scheduled-backup-list.png
   - title: Database detail
     url: https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/database-detail.png
-  - title: Live metrics
-    url: https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/live-metrics.png
 annotations:
   headlamp/plugin/archive-url: https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases/download/v0.1.3/cnpg-headlamp-plugin-0.1.3.tar.gz
   headlamp/plugin/archive-checksum: SHA256:2435788e3ddbc3a08cf202aea1288e24eecda2b88321506e8a4b2eac4a9b2759

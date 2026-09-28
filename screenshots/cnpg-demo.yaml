@@ -14,8 +14,6 @@
 # - ScheduledBackup uses `method: volumeSnapshot` so no S3/ObjectStore is needed.
 #   It will sit un-reconciled on clusters without a VolumeSnapshotClass — that is
 #   fine for screenshots, the row and detail page still render.
-# - The metrics exporter (:9187) is on by default, so `live-metrics.png` works
-#   once the instances are Running; give it a few minutes on first boot.
 apiVersion: v1
 kind: Namespace
 metadata:

@@ -208,50 +208,16 @@ const shots = [
   {
     name: 'cluster-form',
     run: async () => {
-      await navigateAndSettle(`#/c/${CLUSTER}/cnpg/clusters`);
-      // The create form is an Activity overlay, not a route — open it like a user would.
-      await evaluate(`(() => {
-        const b = Array.from(document.querySelectorAll('button'))
-          .find(x => (x.textContent || '').includes('Create / Restore Cluster'));
-        if (!b) throw new Error('create button not found');
-        b.click();
-      })()`);
+      // The create form is a full route page (/cnpg/clusters/new), not an
+      // Activity overlay — navigate to it directly (same as every other shot).
+      await navigateAndSettle(`#/c/${CLUSTER}/cnpg/clusters/new`);
       const ready = await waitFor(
-        `document.body.textContent.includes('Create / Restore Cluster') && document.body.textContent.includes('YAML')`,
+        `document.body.textContent.includes('New Cluster') && document.body.textContent.includes('YAML Preview')`,
         { timeoutMs: 10000 }
       );
-      if (!ready) throw new Error('create form overlay did not open');
+      if (!ready) throw new Error('create form page did not render');
       await sleep(800);
       await capture(`${OUT_DIR}/cluster-form.png`);
-      // Dismiss the overlay so later shots start clean. Escape alone doesn't cut it:
-      // Headlamp's split-right Activity panel doesn't listen for it, so the form used
-      // to leak into the scheduled-backup-list shot. Click the panel's close button
-      // like a user would, verify the form actually went away, and reload as a last
-      // resort (Activities are in-memory, so a reload always clears them).
-      await evaluate(`(() => {
-        const titleEl = Array.from(document.querySelectorAll('*')).find(
-          e => e.children.length === 0 && (e.textContent || '').trim() === 'Create / Restore Cluster'
-        );
-        const scope =
-          (titleEl && titleEl.closest('[role="dialog"], aside, [class*="MuiDrawer"], [class*="MuiDialog"]')) ||
-          document;
-        const closeBtn = Array.from(scope.querySelectorAll('button')).find(
-          b =>
-            /close/i.test(b.getAttribute('aria-label') || b.getAttribute('title') || '') ||
-            ['Close', 'Cancel'].includes((b.textContent || '').trim())
-        );
-        closeBtn?.click();
-      })()`);
-      await sleep(800);
-      // 'YAML' comes from the form's YamlPreview — it isn't on the list page, so its
-      // absence proves the overlay closed.
-      const closed = await evaluate(`!document.body.textContent.includes('YAML')`);
-      if (!closed) {
-        console.warn('  warning: create overlay did not close — reloading to clear it');
-        await send('Page.reload');
-        await sleep(4000);
-        await navigateAndSettle(`#/c/${CLUSTER}/cnpg/clusters`);
-      }
     },
   },
   {
