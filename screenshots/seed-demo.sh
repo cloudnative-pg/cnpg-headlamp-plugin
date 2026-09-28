@@ -6,8 +6,6 @@
 #
 # Applies screenshots/cnpg-demo.yaml, then (with --wait) blocks until the demo
 # Cluster reports a status phase — same readiness gate the CI smoke test uses.
-# Live-metrics shots want more: wait until the instances are Running, e.g.
-#   kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=demo-pg -n cnpg-demo --timeout=600s
 set -euo pipefail
 
 HERE=$(dirname "$0")
