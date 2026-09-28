@@ -182,7 +182,7 @@ export function ClustersList() {
                   color="primary"
                   onClick={() => history.push(getClusterCreateUrl())}
                 >
-                  + Create Cluster
+                  Create Cluster
                 </Button>
               </AuthDisabledButton>,
               <RestoreMenu key="restore-cluster" />,

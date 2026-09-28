@@ -1,7 +1,8 @@
-import { ResourceListView, StatusLabel } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import { Link, ResourceListView, StatusLabel } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Button from '@mui/material/Button';
 import { Pooler } from '../../resources/pooler';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
+import { ListPageHeader, SummaryStat } from '../common/ListHeader';
 import { launchPoolerCreate } from './Create';
 
 export function PoolerStatusLabel({ pooler }: { pooler: Pooler }) {
@@ -14,31 +15,52 @@ export function PoolerStatusLabel({ pooler }: { pooler: Pooler }) {
   return <StatusLabel status="">{pooler.phase ?? '-'}</StatusLabel>;
 }
 
+function poolerStats(poolers: Pooler[]): SummaryStat[] {
+  const total = poolers.length;
+  const paused = poolers.filter(p => p.isPaused).length;
+  const active = poolers.filter(p => !p.isPaused && p.phase === 'active').length;
+  return [
+    { value: total, label: total === 1 ? 'Pooler' : 'Poolers' },
+    { value: active, label: 'Active' },
+    { value: paused, label: 'Paused', highlight: paused > 0 },
+  ];
+}
+
+function PoolerListTitle() {
+  const [poolers] = Pooler.useList();
+  return (
+    <ListPageHeader
+      title="Poolers"
+      actions={[
+        <AuthDisabledButton
+          key="create-pooler"
+          item={Pooler}
+          authVerb="create"
+          deniedMessage="You don't have permission to create Poolers."
+        >
+          <Button variant="contained" color="primary" onClick={() => launchPoolerCreate()}>
+            Create Pooler
+          </Button>
+        </AuthDisabledButton>,
+      ]}
+      stats={poolerStats(poolers ?? [])}
+    />
+  );
+}
+
 export function PoolersList() {
   return (
     <ResourceListView
-      title="Poolers"
+      title={<PoolerListTitle />}
       resourceClass={Pooler}
-      headerProps={{
-        // ResourceListView auto-injects Headlamp's own generic CreateResourceButton next to the
-        // title whenever resourceClass is set and titleSideActions isn't — suppress it here
-        // since our guided create form below already covers that slot via actions.
-        titleSideActions: [],
-        actions: [
-          <AuthDisabledButton
-            key="create-pooler"
-            item={Pooler}
-            authVerb="create"
-            deniedMessage="You don't have permission to create Poolers."
-          >
-            <Button variant="contained" color="primary" onClick={() => launchPoolerCreate()}>
-              Create Pooler
-            </Button>
-          </AuthDisabledButton>,
-        ],
-      }}
+      id="cnpg-poolers"
       columns={[
-        'name',
+        {
+          id: 'name',
+          label: 'Name',
+          getValue: item => item.getName(),
+          render: item => <Link kubeObject={item} />,
+        },
         'namespace',
         {
           id: 'cluster',
