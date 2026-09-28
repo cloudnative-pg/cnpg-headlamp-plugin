@@ -44,7 +44,7 @@ const flag = name => {
 if (flag('help') || args.includes('-h')) {
   console.log(`Usage: node scripts/cdp-screenshots.mjs [cluster-name] [--out=img] [--only=a,b,c]
 
-Shots: operator-status, cluster-list, cluster-detail, live-metrics, cluster-form,
+Shots: operator-status, cluster-list, cluster-detail, cluster-form,
        scheduled-backup-list, database-detail
 Env: CDP_URL, HEADLAMP_CLUSTER, SCREENSHOTS_WIDTH/HEIGHT/SCALE, OUT_DIR`);
   process.exit(0);
@@ -203,32 +203,6 @@ const shots = [
       if (!href) throw new Error('no Cluster found — apply screenshots/cnpg-demo.yaml first?');
       await navigateAndSettle(href.startsWith('#') ? href : `#${href}`);
       await capture(`${OUT_DIR}/cluster-detail.png`);
-    },
-  },
-  {
-    name: 'live-metrics',
-    run: async () => {
-      const href = await detailHrefFromList(
-        `/c/${CLUSTER}/cnpg/clusters`,
-        '/cnpg/clusters/cnpg-demo/demo-pg',
-        '/cnpg/clusters/[^/]+/[^/]+$'
-      );
-      if (!href) throw new Error('no Cluster found — apply screenshots/cnpg-demo.yaml first?');
-      await navigateAndSettle(href.startsWith('#') ? href : `#${href}`);
-      // Metrics are scraped live from each instance's :9187 exporter — wait for the section
-      // to mount, then give the scrape an extra beat before capturing.
-      const ready = await waitFor(
-        `document.body.textContent.includes('Live Metrics')`,
-        { timeoutMs: 15000 }
-      );
-      if (!ready) console.warn('  warning: Live Metrics section not found — capturing anyway');
-      await evaluate(`(() => {
-        const els = Array.from(document.querySelectorAll('*')).filter(e =>
-          e.children.length === 0 && (e.textContent || '').trim() === 'Live Metrics');
-        (els[0] || document.body).scrollIntoView({ block: 'start' });
-      })()`);
-      await sleep(4000);
-      await capture(`${OUT_DIR}/live-metrics.png`);
     },
   },
   {

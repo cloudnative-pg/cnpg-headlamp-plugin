@@ -20,10 +20,6 @@ A [Headlamp](https://headlamp.dev/) plugin for managing and visualizing [CloudNa
     <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/scheduled-backup-list.png" alt="Scheduled backups list" width="400"></td>
     <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/database-detail.png" alt="Database detail" width="400"></td>
   </tr>
-  <tr>
-    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/live-metrics.png" alt="Live metrics" width="400"></td>
-    <td></td>
-  </tr>
  </table>
 
 ## Features
