@@ -45,16 +45,34 @@ export function appliedSeverity(applied: boolean | undefined): StatusSeverity {
   return '';
 }
 
-/** The tag (or digest) portion of a container image reference, e.g. "1.24.1" from
- * "ghcr.io/cloudnative-pg/cloudnative-pg:1.24.1". Falls back to the full image string when no
- * tag/digest can be identified, rather than guessing. */
+/** A tag counts as a release version when it is `v`-prefixed (e.g. "v0.15.0") or looks like a
+ * CNPG-style numeric version (e.g. "1.30.1-ubi9-catalog"). Anything else ("latest", "main",
+ * "devel", …) is a development build. */
+const VERSION_TAG_PATTERN = /^v?\d+(\.\d+)*([-.+].*)?$/;
+
+/** Display-ready version for a container image reference.
+ *
+ * Returns the tag normalized to a single leading `v` (so both "1.30.0" and "v0.15.0" display as
+ * "v1.30.0" / "v0.15.0"), `"devel"` when the image carries no parseable release tag (e.g.
+ * "registry.dev:5000/cnpg-i-spiffe:latest"), and `"-"` when there is no image at all. */
 export function getImageVersion(image: string | undefined): string {
   if (!image) {
     return '-';
   }
-  const lastSegment = image.split('/').pop() ?? image;
-  const [, tag] = lastSegment.split(':');
-  return tag ?? image;
+  // Strip any digest ("repo:tag@sha256:…" or "repo@sha256:…") — the tag, if present, is before it.
+  const withoutDigest = image.split('@')[0] ?? image;
+  // The tag separator is a colon *after* the last slash; a colon before it belongs to a registry
+  // port (e.g. "registry.dev:5000/…").
+  const lastSlash = withoutDigest.lastIndexOf('/');
+  const lastColon = withoutDigest.lastIndexOf(':');
+  if (lastColon <= lastSlash) {
+    return 'devel';
+  }
+  const tag = withoutDigest.slice(lastColon + 1);
+  if (!tag || !VERSION_TAG_PATTERN.test(tag)) {
+    return 'devel';
+  }
+  return tag.startsWith('v') ? tag : `v${tag}`;
 }
 
 /**

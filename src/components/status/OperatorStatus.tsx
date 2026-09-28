@@ -211,7 +211,7 @@ function OperatorSummaryCard({
         </StatusLabel>
       }
     >
-      <Box>v{version}</Box>
+      <Box>{version}</Box>
       <Box>{replicas}</Box>
     </SummaryCard>
   );
@@ -442,7 +442,7 @@ function OperatorCard({ pods, deployment }: { pods: Pod[] | null; deployment: De
         ) : installed ? (
           <>
             <Box display="flex" flexWrap="wrap" gap={2} mt={1} mb={1}>
-              <Typography variant="body2">v{version}</Typography>
+              <Typography variant="body2">{version}</Typography>
               <Typography variant="body2" color="textSecondary">
                 {namespace}
               </Typography>
@@ -536,7 +536,7 @@ function PluginCard({
           {pluginId}
         </Typography>
         <Box display="flex" flexWrap="wrap" gap={2} mt={1} mb={1}>
-          <Typography variant="body2">v{version}</Typography>
+          <Typography variant="body2">{version}</Typography>
           <Typography variant="body2" color="textSecondary">
             {service.getNamespace()}
           </Typography>

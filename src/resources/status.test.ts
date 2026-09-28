@@ -47,16 +47,34 @@ describe('appliedSeverity', () => {
 });
 
 describe('getImageVersion', () => {
-  it('extracts the tag from a fully-qualified image', () => {
-    expect(getImageVersion('ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0')).toBe('1.30.0');
+  it('extracts the tag from a fully-qualified image, normalizing to a single leading v', () => {
+    expect(getImageVersion('ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0')).toBe('v1.30.0');
+    expect(getImageVersion('ghcr.io/cloudnative-pg/cloudnative-pg:1.30.1-ubi9-catalog')).toBe(
+      'v1.30.1-ubi9-catalog'
+    );
+    expect(getImageVersion('ghcr.io/cloudnative-pg/plugin-barman-cloud:v0.15.0')).toBe('v0.15.0');
   });
 
   it('falls back to a placeholder for a missing image', () => {
     expect(getImageVersion(undefined)).toBe('-');
   });
 
-  it('falls back to the full image string when there is no tag', () => {
-    expect(getImageVersion('postgres')).toBe('postgres');
+  it('reports devel for non-version tags, including registries with a port', () => {
+    expect(getImageVersion('registry.dev:5000/cnpg-i-spiffe:latest')).toBe('devel');
+    expect(getImageVersion('ghcr.io/cloudnative-pg/cloudnative-pg:main')).toBe('devel');
+  });
+
+  it('reports devel when there is no tag', () => {
+    expect(getImageVersion('postgres')).toBe('devel');
+  });
+
+  it('ignores digests when extracting the tag', () => {
+    expect(
+      getImageVersion(
+        'ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0@sha256:abc123'
+      )
+    ).toBe('v1.30.0');
+    expect(getImageVersion('registry.dev:5000/cnpg-i-spiffe:latest@sha256:abc123')).toBe('devel');
   });
 });
 
