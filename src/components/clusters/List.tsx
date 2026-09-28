@@ -150,7 +150,7 @@ const clusterColumns: (ResourceTableColumn<Cluster> | ColumnType)[] = [
   },
   {
     id: 'replication',
-    label: 'Replication',
+    label: 'Synchronous Replication',
     getValue: item => (item.hasSynchronousReplication ? 'Enabled' : 'Disabled'),
     render: item => (item.hasSynchronousReplication ? '✓ Enabled' : '— Disabled'),
   },
