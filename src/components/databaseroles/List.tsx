@@ -1,10 +1,17 @@
 import { Router } from '@kinvolk/headlamp-plugin/lib';
-import { ResourceListView } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import {
+  ColumnType,
+  Link,
+  ResourceListView,
+  ResourceTableColumn,
+} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Button from '@mui/material/Button';
+import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { DatabaseRole } from '../../resources/databaseRole';
 import { AppliedStatusLabel } from '../common/AppliedStatusLabel';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
+import { ListPageHeader, SummaryStat } from '../common/ListHeader';
 import { launchDatabaseRoleCreate } from './Create';
 
 const { createRouteURL } = Router;
@@ -13,9 +20,25 @@ export function DatabaseRoleAppliedLabel({ databaseRole }: { databaseRole: Datab
   return <AppliedStatusLabel applied={databaseRole.applied} message={databaseRole.message} />;
 }
 
-function databaseRoleColumns(): any[] {
+function databaseRoleStats(items: DatabaseRole[]): SummaryStat[] {
+  const total = items.length;
+  const applied = items.filter(item => item.applied === true).length;
+  const needsAttention = items.filter(item => item.applied === false).length;
   return [
-    'name',
+    { value: total, label: total === 1 ? 'Role' : 'Roles' },
+    { value: applied, label: 'Applied' },
+    { value: needsAttention, label: 'Needs attention', highlight: needsAttention > 0 },
+  ];
+}
+
+function databaseRoleColumns(): (ResourceTableColumn<DatabaseRole> | ColumnType)[] {
+  return [
+    {
+      id: 'name',
+      label: 'Name',
+      getValue: (item: DatabaseRole) => item.getName(),
+      render: (item: DatabaseRole) => <Link kubeObject={item} />,
+    },
     'namespace',
     {
       id: 'cluster',
@@ -52,6 +75,32 @@ function databaseRoleColumns(): any[] {
   ];
 }
 
+function databaseRoleActions(): ReactNode[] {
+  return [
+    <AuthDisabledButton
+      key="create-databaserole"
+      item={DatabaseRole}
+      authVerb="create"
+      deniedMessage="You don't have permission to create DatabaseRoles."
+    >
+      <Button variant="contained" color="primary" onClick={() => launchDatabaseRoleCreate()}>
+        Create Role
+      </Button>
+    </AuthDisabledButton>,
+  ];
+}
+
+function DatabaseRoleListTitleDefault() {
+  const [roles] = DatabaseRole.useList();
+  return (
+    <ListPageHeader
+      title="Roles"
+      actions={databaseRoleActions()}
+      stats={databaseRoleStats(roles ?? [])}
+    />
+  );
+}
+
 export function DatabaseRolesList() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -68,35 +117,22 @@ export function DatabaseRolesList() {
     ? (allDatabaseRoles ?? []).filter(item => item.clusterName === clusterFilter)
     : null;
 
-  const headerProps = {
-    // ResourceListView auto-injects Headlamp's own generic CreateResourceButton next to the
-    // title whenever resourceClass is set and titleSideActions isn't — suppress it here since
-    // our guided create form below already covers that slot via actions.
-    titleSideActions: [],
-    actions: [
-      <AuthDisabledButton
-        key="create-databaserole"
-        item={DatabaseRole}
-        authVerb="create"
-        deniedMessage="You don't have permission to create DatabaseRoles."
-      >
-        <Button variant="contained" color="primary" onClick={() => launchDatabaseRoleCreate()}>
-          Create Role
-        </Button>
-      </AuthDisabledButton>,
-    ],
-  };
-
   if (clusterFilter) {
     return (
       <ResourceListView
-        title={`Roles for ${clusterFilter}`}
+        title={
+          <ListPageHeader
+            title={`Roles for ${clusterFilter}`}
+            actions={databaseRoleActions()}
+            stats={databaseRoleStats(filteredDatabaseRoles ?? [])}
+          />
+        }
         backLink={createRouteURL('CNPG Cluster', {
           namespace: namespaceFilter,
           name: clusterFilter,
         })}
         data={filteredDatabaseRoles}
-        headerProps={headerProps}
+        id="cnpg-database-roles"
         columns={databaseRoleColumns()}
       />
     );
@@ -104,9 +140,9 @@ export function DatabaseRolesList() {
 
   return (
     <ResourceListView
-      title="Roles"
+      title={<DatabaseRoleListTitleDefault />}
       resourceClass={DatabaseRole}
-      headerProps={headerProps}
+      id="cnpg-database-roles"
       columns={databaseRoleColumns()}
     />
   );

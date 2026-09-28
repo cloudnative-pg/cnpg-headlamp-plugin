@@ -17,7 +17,7 @@ interface CatalogImagesEditorProps {
 }
 
 // The repeated {major, image} list shared by the ImageCatalog and ClusterImageCatalog create
-// forms — same "add/remove row" pattern as the Tablespaces editor in clusters/Create.tsx.
+// forms — same "add/remove row" pattern as the Tablespaces editor in clusters/create/CreatePage.tsx.
 export function CatalogImagesEditor({ idPrefix, rows, onChange }: CatalogImagesEditorProps) {
   function updateRow(id: string, changes: Partial<CatalogImageRow>) {
     onChange(rows.map(row => (row.id === id ? { ...row, ...changes } : row)));

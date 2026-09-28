@@ -126,7 +126,7 @@ export class Cluster extends KubeObject<CnpgCluster> {
   static isNamespaced = true;
 
   // Seeds the "Create" YAML editor with a minimal working example instead of an empty object.
-  // The guided form is components/clusters/Create.tsx (launchClusterCreate) — this is only a
+  // The guided form is components/clusters/create/CreatePage.tsx — this is only a
   // fallback for anything that falls back to a raw-YAML create flow.
   static getBaseObject() {
     return {
