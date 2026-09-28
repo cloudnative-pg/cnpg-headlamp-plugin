@@ -54,11 +54,6 @@ const CRD_GROUPS: { group: string; label: string; crdNames: string[] }[] = [
       'subscriptions',
     ],
   },
-  {
-    group: 'barmancloud.cnpg.io',
-    label: 'Barman Cloud plugin (barmancloud.cnpg.io)',
-    crdNames: ['objectstores'],
-  },
 ];
 
 type PluginHealth = 'running' | 'degraded';
@@ -511,9 +506,14 @@ function PluginCard({
     <Card variant="outlined" sx={{ height: '100%' }}>
       <CardContent>
         <Box display="flex" alignItems="center" justifyContent="space-between" gap={1}>
-          <Typography variant="h6" component="div">
-            {humanizePluginName(pluginId)}
-          </Typography>
+          <Box display="flex" alignItems="baseline" gap={1}>
+            <Typography variant="h6" component="div">
+              {humanizePluginName(pluginId)}
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ fontFamily: 'monospace' }}>
+              {pluginId}
+            </Typography>
+          </Box>
           {health && (
             <Box display="flex" alignItems="center" gap={1}>
               <HealthStatusIcon
@@ -532,9 +532,6 @@ function PluginCard({
             </Box>
           )}
         </Box>
-        <Typography variant="body2" color="textSecondary" sx={{ fontFamily: 'monospace' }}>
-          {pluginId}
-        </Typography>
         <Box display="flex" flexWrap="wrap" gap={2} mt={1} mb={1}>
           <Typography variant="body2">{version}</Typography>
           <Typography variant="body2" color="textSecondary">

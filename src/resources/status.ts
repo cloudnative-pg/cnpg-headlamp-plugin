@@ -83,11 +83,13 @@ export function getImageVersion(image: string | undefined): string {
  */
 export const KNOWN_PLUGIN_CAPABILITIES: Record<string, string[]> = {
   'barman-cloud.cloudnative-pg.io': ['Backup', 'WAL archiving', 'Restore'],
+  'klio.cnpg.io': ['Backup', 'WAL archiving', 'Restore'],
 };
 
 /** Display names for well-known CNPG-i plugin IDs (the `cnpg.io/pluginName` label value). */
 const KNOWN_PLUGIN_NAMES: Record<string, string> = {
   'barman-cloud.cloudnative-pg.io': 'Barman Cloud',
+  'klio.cnpg.io': 'Klio',
 };
 
 /** Turns a `cnpg.io/pluginName` label value into a human-readable title, e.g.
