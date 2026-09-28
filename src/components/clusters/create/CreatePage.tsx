@@ -1023,7 +1023,7 @@ export function CreateClusterPage() {
       }}
     >
       <Typography variant="h1" component="h1" sx={{ mb: 2 }}>
-        Create / Restore Cluster
+        {state.startOption === 'empty' ? 'New Cluster' : 'Restore Cluster'}
       </Typography>
 
       <Box
