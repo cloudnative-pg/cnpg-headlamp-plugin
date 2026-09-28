@@ -14,11 +14,12 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
 import { Cluster } from '../../../resources/cluster';
 import { ClusterImageCatalog, ImageCatalog } from '../../../resources/imageCatalog';
 import { ObjectStore } from '../../../resources/objectStore';
+import { PluginConfiguration } from '../../../resources/pluginConfiguration';
 import { VolumeSnapshotClass } from '../../../resources/volumeSnapshotClass';
 import { AuthDisabledButton } from '../../common/AuthDisabledButton';
 import { RequiredLabel } from '../../common/RequiredLabel';
@@ -205,6 +206,7 @@ function GeneralTab({
 }: TabProps & { goToTab: (tab: CreateTab) => void }) {
   const [namespaces] = K8s.ResourceClasses.Namespace.useList();
   const [objectStores] = ObjectStore.useList({ namespace: state.namespace });
+  const [pluginConfigurations] = PluginConfiguration.useList({ namespace: state.namespace });
   const selection = instanceCardSelection(state.instances);
   const nameInvalid = !!state.name && !NAME_PATTERN.test(state.name);
 
@@ -330,10 +332,11 @@ function GeneralTab({
                 onChange={e => update({ startOption: e.target.value as StartOption })}
               >
                 <MenuItem value="barman-recovery">
-                  Barman Cloud plugin — ObjectStore + server
+                  Barman Cloud plugin
                 </MenuItem>
+                <MenuItem value="klio-recovery">Klio plugin</MenuItem>
                 <MenuItem value="custom-recovery">
-                  Custom plugin — any CNPG plugin, free-form name + parameters
+                  Custom plugin
                 </MenuItem>
               </Select>
             </FormControl>
@@ -366,6 +369,36 @@ function GeneralTab({
                   onChange={e => update({ recoveryServerName: e.target.value })}
                   sx={{ flex: 1, minWidth: 200 }}
                 />
+              </Box>
+            )}
+
+            {state.startOption === 'klio-recovery' && (
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label={<RequiredLabel label="External cluster name" required />}
+                  value={state.recoveryExternalClusterName}
+                  onChange={e => update({ recoveryExternalClusterName: e.target.value })}
+                  sx={{ flex: 1, minWidth: 200 }}
+                />
+                <FormControl fullWidth margin="normal" sx={{ flex: 1, minWidth: 200 }}>
+                  <InputLabel id="create-cluster-klio-pluginconfig-label">
+                    <RequiredLabel label="Plugin configuration" required />
+                  </InputLabel>
+                  <Select
+                    labelId="create-cluster-klio-pluginconfig-label"
+                    label={<RequiredLabel label="Plugin configuration" required />}
+                    value={state.recoveryPluginConfigurationRef}
+                    onChange={e => update({ recoveryPluginConfigurationRef: e.target.value })}
+                  >
+                    {(pluginConfigurations ?? []).map(pc => (
+                      <MenuItem key={pc.getName()} value={pc.getName()}>
+                        {pc.getName()}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Box>
             )}
 
@@ -941,25 +974,6 @@ export function CreateClusterPage() {
   const [dryRunValidating, setDryRunValidating] = useState(false);
 
   const rowIdCounter = useRef(0);
-  const imageAutoSelected = useRef(false);
-
-  const [imageCatalogs] = ImageCatalog.useList({ namespace: state.namespace });
-  const [clusterImageCatalogs] = ClusterImageCatalog.useList();
-  const hasCatalogs = (imageCatalogs?.length ?? 0) + (clusterImageCatalogs?.length ?? 0) > 0;
-
-  // Pre-select the catalog image source when catalogs exist, per the plan. Runs
-  // once so it never overrides an explicit user choice afterwards.
-  useEffect(() => {
-    if (!imageAutoSelected.current && hasCatalogs && state.imageSource === 'default') {
-      imageAutoSelected.current = true;
-      setState(prev =>
-        prev.imageSource === 'default' ? { ...prev, imageSource: 'catalog' } : prev
-      );
-    }
-    if (!imageAutoSelected.current && (imageCatalogs !== null || clusterImageCatalogs !== null)) {
-      imageAutoSelected.current = true;
-    }
-  }, [hasCatalogs, state.imageSource, imageCatalogs, clusterImageCatalogs]);
 
   function update(patch: Partial<ClusterCreateFormState>) {
     setState(prev => ({ ...prev, ...patch }));

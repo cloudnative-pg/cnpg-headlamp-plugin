@@ -1,6 +1,7 @@
 import type { StorageConfiguration } from '../../../resources/cluster';
 
 export const BARMAN_CLOUD_PLUGIN_NAME = 'barman-cloud.cloudnative-pg.io';
+export const KLIO_PLUGIN_NAME = 'klio.cnpg.io';
 export const DEFAULT_RECOVERY_EXTERNAL_CLUSTER_NAME = 'recovery-source';
 
 // The operator rejects a Cluster that sets both imageName and imageCatalogRef, so the form
@@ -9,7 +10,7 @@ export const DEFAULT_RECOVERY_EXTERNAL_CLUSTER_NAME = 'recovery-source';
 export type ImageSource = 'default' | 'catalog' | 'imageName';
 export type CatalogKind = 'ImageCatalog' | 'ClusterImageCatalog';
 
-export type StartOption = 'empty' | 'barman-recovery' | 'custom-recovery';
+export type StartOption = 'empty' | 'barman-recovery' | 'klio-recovery' | 'custom-recovery';
 export type BackupKind = 'barman' | 'custom';
 export type SyncMethod = 'any' | 'first';
 export type SyncDataDurability = 'required' | 'preferred';
@@ -39,6 +40,8 @@ export interface ClusterCreateFormState {
   recoveryExternalClusterName: string;
   recoveryPluginName: string;
   recoveryPluginParams: KVRow[];
+  // Klio-plugin recovery: external cluster + a pluginconfigurations.klio.cnpg.io reference.
+  recoveryPluginConfigurationRef: string;
   // PostgreSQL image.
   imageSource: ImageSource;
   imageName: string;
@@ -82,8 +85,9 @@ export function defaultFormState(): ClusterCreateFormState {
     recoveryObjectStoreName: '',
     recoveryServerName: '',
     recoveryExternalClusterName: DEFAULT_RECOVERY_EXTERNAL_CLUSTER_NAME,
-    recoveryPluginName: BARMAN_CLOUD_PLUGIN_NAME,
+    recoveryPluginName: '',
     recoveryPluginParams: [],
+    recoveryPluginConfigurationRef: '',
     imageSource: 'default',
     imageName: '',
     imageCatalogKind: 'ClusterImageCatalog',
@@ -256,6 +260,21 @@ export function buildClusterManifest(state: ClusterCreateFormState) {
         },
       },
     ];
+  } else if (state.startOption === 'klio-recovery') {
+    const externalName =
+      state.recoveryExternalClusterName.trim() || DEFAULT_RECOVERY_EXTERNAL_CLUSTER_NAME;
+    spec.bootstrap = { recovery: { source: externalName } };
+    spec.externalClusters = [
+      {
+        name: externalName,
+        plugin: {
+          name: KLIO_PLUGIN_NAME,
+          parameters: {
+            pluginConfigurationRef: state.recoveryPluginConfigurationRef,
+          },
+        },
+      },
+    ];
   } else if (state.startOption === 'custom-recovery') {
     const externalName =
       state.recoveryExternalClusterName.trim() || DEFAULT_RECOVERY_EXTERNAL_CLUSTER_NAME;
@@ -330,6 +349,8 @@ export function deriveSummary(state: ClusterCreateFormState): ClusterSummary {
       ? 'empty'
       : state.startOption === 'barman-recovery'
       ? 'recovery via barman'
+      : state.startOption === 'klio-recovery'
+      ? 'recovery via klio'
       : 'recovery via custom plugin';
 
   const params = collectParameters(state);
@@ -386,6 +407,11 @@ export function getValidationErrors(state: ClusterCreateFormState): string[] {
   if (state.startOption === 'barman-recovery') {
     if (!state.recoveryObjectStoreName || !state.recoveryServerName.trim()) {
       errors.push('Recovery ObjectStore and source server are required for Barman recovery.');
+    }
+  }
+  if (state.startOption === 'klio-recovery') {
+    if (!state.recoveryExternalClusterName.trim() || !state.recoveryPluginConfigurationRef) {
+      errors.push('External cluster name and plugin configuration are required for Klio recovery.');
     }
   }
   if (state.startOption === 'custom-recovery') {

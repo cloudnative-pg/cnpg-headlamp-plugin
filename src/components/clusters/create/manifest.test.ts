@@ -7,6 +7,7 @@ import {
   deriveSummary,
   getValidationErrors,
   instanceCardSelection,
+  KLIO_PLUGIN_NAME,
   validateDryRun,
 } from './types';
 
@@ -112,6 +113,25 @@ describe('buildClusterManifest', () => {
         plugin: {
           name: BARMAN_CLOUD_PLUGIN_NAME,
           parameters: { barmanObjectName: 'team-backups', serverName: 'old-cluster' },
+        },
+      },
+    ]);
+  });
+
+  it('writes klio recovery with the fixed plugin name and pluginConfigurationRef', () => {
+    const manifest = buildClusterManifest({
+      ...baseState(),
+      startOption: 'klio-recovery',
+      recoveryExternalClusterName: 'my-source',
+      recoveryPluginConfigurationRef: 'my-plugin-config',
+    });
+    expect(manifest.spec.bootstrap).toEqual({ recovery: { source: 'my-source' } });
+    expect(manifest.spec.externalClusters).toEqual([
+      {
+        name: 'my-source',
+        plugin: {
+          name: KLIO_PLUGIN_NAME,
+          parameters: { pluginConfigurationRef: 'my-plugin-config' },
         },
       },
     ]);
