@@ -177,6 +177,21 @@ describe('buildClusterManifest', () => {
     expect(manifest.spec.backup).toEqual({ volumeSnapshot: { className: 'csi-snap' } });
   });
 
+  it('writes klio backup without the WAL archiver flag', () => {
+    const manifest = buildClusterManifest({
+      ...baseState(),
+      backupEnabled: true,
+      backupKind: 'klio',
+      backupPluginConfigurationRef: 'client-config-example-plugin',
+    });
+    expect(manifest.spec.plugins).toEqual([
+      {
+        name: KLIO_PLUGIN_NAME,
+        parameters: { pluginConfigurationRef: 'client-config-example-plugin' },
+      },
+    ]);
+  });
+
   it('writes custom backup plugin with params and archiver flag', () => {
     const manifest = buildClusterManifest({
       ...baseState(),
@@ -258,6 +273,16 @@ describe('deriveSummary', () => {
     expect(summary.replication).toBe('async');
     expect(summary.backup).toBe('Enabled (custom: my-backup.cnpg.io)');
   });
+
+  it('reports klio backup plugin with its configuration', () => {
+    const summary = deriveSummary({
+      ...baseState(),
+      backupEnabled: true,
+      backupKind: 'klio',
+      backupPluginConfigurationRef: 'client-config-example-plugin',
+    });
+    expect(summary.backup).toBe('Enabled (klio: client-config-example-plugin)');
+  });
 });
 
 describe('getValidationErrors', () => {
@@ -274,6 +299,15 @@ describe('getValidationErrors', () => {
       'Recovery ObjectStore and source server are required for Barman recovery.'
     );
     expect(errors).toContain('Backup ObjectStore is required when Barman backups are enabled.');
+  });
+
+  it('requires a plugin configuration for klio backups', () => {
+    const errors = getValidationErrors({
+      ...baseState(),
+      backupEnabled: true,
+      backupKind: 'klio',
+    });
+    expect(errors).toContain('Plugin configuration is required when Klio backups are enabled.');
   });
 });
 
