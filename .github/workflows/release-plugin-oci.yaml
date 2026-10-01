@@ -1,0 +1,121 @@
+name: Build and publish plugin container image
+
+on:
+  # Automatic path: when release-please publishes a vX.Y.Z release,
+  # build the tagged plugin source and publish its OCI image to GHCR.
+  release:
+    types: [published]
+  # Manual path: retry a failed run (or cut a release without release-please)
+  # by providing an existing tag such as v0.1.0.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The plugin version (without a v prefix e.g., 0.1.0) - if not provided, will use version from package.json"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  ORG: ${{ github.repository_owner }}
+  PLUGIN: cnpg-headlamp-plugin
+  IMAGE_NAME: cnpg-headlamp-plugin
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # needed for publishing the container image
+      attestations: write
+      id-token: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 #v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 #v4.4.0
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 #v4.4.1
+
+      - name: Determine version
+        id: determine_version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            echo "Version not provided, extracting from package.json"
+            VERSION=$(node -p "require('./package.json').version")
+            echo "Extracted version: $VERSION"
+          fi
+          # Remove leading 'v' if present
+          VERSION="${VERSION#v}"
+          # Create v-prefixed version for image tags
+          IMAGE_TAG_VERSION="v${VERSION}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "IMAGE_TAG_VERSION=$IMAGE_TAG_VERSION" >> $GITHUB_ENV
+          echo "FULL_IMAGE_NAME=${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f #v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build Docker image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc #v7.4.0
+        timeout-minutes: 15
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ${{ env.FULL_IMAGE_NAME }}:${{ env.IMAGE_TAG_VERSION }},${{ env.FULL_IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.event.repository.html_url }}
+            org.opencontainers.image.licenses=Apache-2.0
+          build-args: PLUGIN=${{ env.PLUGIN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test
+        run: |
+          docker run --rm ${{ env.FULL_IMAGE_NAME }}:latest sh -c "ls /plugins/${{ env.PLUGIN }}"
+
+      - name: Push Docker image
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc #v7.4.0
+        with:
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.FULL_IMAGE_NAME }}:${{ env.IMAGE_TAG_VERSION }},${{ env.FULL_IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.event.repository.html_url }}
+            org.opencontainers.image.licenses=Apache-2.0
+          provenance: true
+          build-args: PLUGIN=${{ env.PLUGIN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+    
+      - name: Summary
+        run: |
+          echo "## Container Image Published" >> $GITHUB_STEP_SUMMARY
+          echo "Plugin: ${{ env.PLUGIN }}" >> $GITHUB_STEP_SUMMARY
+          echo "Version: ${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "Image: ${{ env.FULL_IMAGE_NAME }}:${{ env.IMAGE_TAG_VERSION }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate artifact attestation
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 #v4.2.2
+        with:
+          subject-name: ${{ env.FULL_IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

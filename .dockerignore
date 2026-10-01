@@ -1,0 +1,11 @@
+node_modules
+.git
+*.md
+tests/
+coverage/
+.env
+*.log
+.github/
+.vscode/
+screenshots/
+img/
