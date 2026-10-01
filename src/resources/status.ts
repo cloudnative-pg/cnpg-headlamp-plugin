@@ -12,6 +12,35 @@
 /** Severity values accepted by CommonComponents' `StatusLabel`. */
 export type StatusSeverity = 'success' | 'error' | 'warning' | '';
 
+/**
+ * Mirrors Go's strconv.ParseBool, which is how CNPG itself parses boolean-like strings
+ * (e.g. the `cnpg.io/hibernation` status condition's `"True"`/`"False"`): accepts 1, t, T,
+ * TRUE, true, True as true and 0, f, F, FALSE, false, False as false. Returns undefined for
+ * anything else (including absent), so callers can distinguish "explicitly false" from "no
+ * value reported". Notably, CNPG's `on`/`off` annotation values are *not* ParseBool values —
+ * they must never be passed here.
+ */
+export function parseBool(value: string | undefined): boolean | undefined {
+  switch (value) {
+    case '1':
+    case 't':
+    case 'T':
+    case 'TRUE':
+    case 'true':
+    case 'True':
+      return true;
+    case '0':
+    case 'f':
+    case 'F':
+    case 'FALSE':
+    case 'false':
+    case 'False':
+      return false;
+    default:
+      return undefined;
+  }
+}
+
 /** Phases CNPG reports on `Backup.status.phase`. */
 export function backupPhaseSeverity(phase: string | undefined): StatusSeverity {
   switch (phase) {
