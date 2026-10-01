@@ -5,7 +5,30 @@ import {
   getImageVersion,
   humanizePluginName,
   KNOWN_PLUGIN_CAPABILITIES,
+  parseBool,
 } from './status';
+
+describe('parseBool', () => {
+  // Mirrors Go's strconv.ParseBool exactly — every accepted spelling must round-trip, since
+  // CNPG writes e.g. "True" into status conditions and this is what parses them back out.
+  it.each(['1', 't', 'T', 'TRUE', 'true', 'True'])('parses %s as true', value => {
+    expect(parseBool(value)).toBe(true);
+  });
+
+  it.each(['0', 'f', 'F', 'FALSE', 'false', 'False'])('parses %s as false', value => {
+    expect(parseBool(value)).toBe(false);
+  });
+
+  // CNPG's hibernation annotation uses `on`/`off`, which strconv.ParseBool rejects — passing
+  // those here must not read as either boolean, otherwise the annotation and the status
+  // condition (`"True"`/`"False"`) would be conflated.
+  it.each([undefined, '', 'on', 'off', 'ON', 'OFF', 'yes', 'no', '2', ' true'])(
+    'returns undefined for %s',
+    value => {
+      expect(parseBool(value)).toBeUndefined();
+    }
+  );
+});
 
 describe('backupPhaseSeverity', () => {
   it('marks a completed backup as success', () => {
@@ -69,11 +92,9 @@ describe('getImageVersion', () => {
   });
 
   it('ignores digests when extracting the tag', () => {
-    expect(
-      getImageVersion(
-        'ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0@sha256:abc123'
-      )
-    ).toBe('v1.30.0');
+    expect(getImageVersion('ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0@sha256:abc123')).toBe(
+      'v1.30.0'
+    );
     expect(getImageVersion('registry.dev:5000/cnpg-i-spiffe:latest@sha256:abc123')).toBe('devel');
   });
 });
