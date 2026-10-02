@@ -10,12 +10,14 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { Cluster } from '../../resources/cluster';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
 import { getClusterCreateUrl } from './create/CreatePage';
+import { HibernateListAction } from './hibernate';
 
 // "Restore" lands on the same guided page as "Create Cluster", just pre-switched to the
 // recovery start option (restore from an object store) via ?start=recovery.
@@ -70,12 +72,14 @@ function ClusterSummaryBar() {
 
   const total = clusters?.length ?? 0;
   const healthy = (clusters ?? []).filter(c => c.health === 'success').length;
-  const needsAttention = total - healthy;
+  const hibernated = (clusters ?? []).filter(c => c.isHibernated).length;
+  const needsAttention = total - healthy - hibernated;
   const instances = (clusters ?? []).reduce((sum, c) => sum + c.instances, 0);
 
   const stats: { value: number; label: string; highlight?: boolean }[] = [
     { value: total, label: total === 1 ? 'Cluster' : 'Clusters' },
     { value: healthy, label: 'Healthy' },
+    { value: hibernated, label: 'Hibernated' },
     { value: needsAttention, label: 'Needs attention', highlight: needsAttention > 0 },
     { value: instances, label: 'Instances' },
   ];
@@ -118,14 +122,32 @@ const clusterColumns: (ResourceTableColumn<Cluster> | ColumnType)[] = [
     id: 'cluster',
     label: 'Cluster',
     getValue: item => item.getName(),
-    render: item => <Link kubeObject={item} />,
+    // A hibernated cluster has no detail page (no pods, no status to show), so its name
+    // renders as plain text rather than a link — rehydration happens from this list.
+    render: item =>
+      item.isHibernated ? (
+        <Tooltip title="Hibernated — detail view unavailable until rehydrated">
+          <span>{item.getName()}</span>
+        </Tooltip>
+      ) : (
+        <Link kubeObject={item} />
+      ),
   },
   'namespace',
   {
     id: 'status',
     label: 'Status',
     getValue: item => item.healthLabel,
-    render: item => <StatusLabel status={item.health}>{item.healthLabel}</StatusLabel>,
+    render: item =>
+      item.isHibernated ? (
+        <Tooltip title="Instance pods deleted, storage retained — rehydrate to resume">
+          <span>
+            <StatusLabel status={item.health}>{item.healthLabel}</StatusLabel>
+          </span>
+        </Tooltip>
+      ) : (
+        <StatusLabel status={item.health}>{item.healthLabel}</StatusLabel>
+      ),
   },
   {
     id: 'primary',
@@ -156,6 +178,19 @@ const clusterColumns: (ResourceTableColumn<Cluster> | ColumnType)[] = [
   },
   'age',
 ];
+
+// Hibernate/rehydrate toggle in the table's row-action menu (right side). Headlamp renders
+// `actions` inside each row's "⋮" menu, so the toggle uses the menu button style there.
+function clusterRowActions() {
+  return [
+    {
+      id: 'cnpg-cluster-hibernate',
+      action: ({ item, closeMenu }: { item: Cluster; closeMenu?: () => void }) => (
+        <HibernateListAction cluster={item} closeMenu={closeMenu} />
+      ),
+    },
+  ];
+}
 
 export function ClustersList() {
   const history = useHistory();
@@ -196,6 +231,8 @@ export function ClustersList() {
       resourceClass={Cluster}
       id="cnpg-clusters"
       columns={clusterColumns}
+      enableRowActions
+      actions={clusterRowActions()}
     />
   );
 }

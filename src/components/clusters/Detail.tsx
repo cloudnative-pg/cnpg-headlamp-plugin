@@ -32,7 +32,7 @@ import Tabs from '@mui/material/Tabs';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { useHistory, useParams } from 'react-router-dom';
+import { Redirect, useHistory, useParams } from 'react-router-dom';
 import { Backup } from '../../resources/backup';
 import { Cluster } from '../../resources/cluster';
 import { FailoverQuorum } from '../../resources/failoverQuorum';
@@ -68,6 +68,7 @@ import {
   ScheduledBackupSuspendLabel,
 } from '../scheduledbackups/List';
 import { launchConnectActivity } from './connect';
+import { HibernateDetailAction } from './hibernate';
 import { SwitchoverAction } from './switchover';
 
 const { createRouteURL } = Router;
@@ -1940,6 +1941,7 @@ function ClusterHeaderActions({ cluster }: { cluster: Cluster }) {
       />
       <EditButton item={cluster} />
       <DeleteButton item={cluster} />
+      <HibernateDetailAction cluster={cluster} />
     </Box>
   );
 }
@@ -1971,6 +1973,14 @@ export function ClusterDetail() {
 
   if (!cluster) {
     return <Loader title={`Loading Cluster ${namespace}/${name}`} />;
+  }
+
+  if (cluster.isHibernated) {
+    // A hibernated cluster has no pods or meaningful status, so there is nothing for the detail
+    // view to show — and rehydration lives on the cluster list anyway. Bounce there instead of
+    // rendering empty tabs. (Unreachable in practice: the list doesn't link hibernated clusters
+    // and Headlamp has no URL bar; this is just a backstop for stale links.)
+    return <Redirect to={createRouteURL('CNPG Clusters')} />;
   }
 
   const created = cluster.jsonData.metadata?.creationTimestamp;
