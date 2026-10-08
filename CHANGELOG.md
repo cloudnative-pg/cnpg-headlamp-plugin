@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/compare/v0.1.4...v0.1.5) (2026-10-08)
+
+
+### Features
+
+* **clusters:** add hibernation and rehydration support ([#80](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/issues/80)) ([aa39a63](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/commit/aa39a6345752923bb53d9988dc3432e62969eccd))
+
 ## [0.1.4](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/compare/v0.1.3...v0.1.4) (2026-09-28)
 
 
