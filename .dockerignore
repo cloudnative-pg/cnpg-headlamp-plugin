@@ -1,11 +1,24 @@
-node_modules
+# Repository metadata
 .git
-*.md
-tests/
-coverage/
-.env
-*.log
 .github/
 .vscode/
+
+# Dependencies and generated output
+node_modules/
+build/
+dist/
+coverage/
+*.tar.gz
+.eslintcache
+
+# Local-only files
+.env
+*.log
+
+# Tests, documentation, and image assets
+*.md
+tests/
+docs/
 screenshots/
 img/
+.DS_Store
