@@ -47,9 +47,6 @@ COPY --from=builder /headlamp-plugins/build/ /plugins/
 RUN chown -R headlamp:headlamp /plugins && \
     chmod -R 755 /plugins
 
-LABEL org.opencontainers.image.source=https://github.com/cloudnative-pg/cnpg-headlamp-plugin
-LABEL org.opencontainers.image.licenses=Apache-2.0
-
 # Switch to non-root user
 USER headlamp
 
