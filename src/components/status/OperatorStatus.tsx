@@ -24,6 +24,13 @@ import { CnpgLogo } from '../common/CnpgLogo';
 import { Pod, PodStatusLabel } from '../common/podActions';
 import { ViewLogsButton } from '../common/podLogs';
 import { OpenTerminalButton } from '../common/podTerminal';
+import {
+  BARMAN_PLUGIN_ID,
+  ComponentCards,
+  InstallationWorkflow,
+  KLIO_PLUGIN_ID,
+  useCertManagerStatus,
+} from './InstallGuide';
 
 type Crd = InstanceType<typeof K8s.ResourceClasses.CustomResourceDefinition>;
 type Deployment = InstanceType<typeof K8s.ResourceClasses.Deployment>;
@@ -357,9 +364,9 @@ function HealthBanner({
   const operatorPods = pods ?? [];
   if (operatorPods.length === 0) {
     return (
-      <Alert severity="error" sx={bannerSx('error')}>
-        <AlertTitle>Operator is not installed</AlertTitle>
-        No pod matching label {OPERATOR_LABEL} was found in any namespace.
+      <Alert severity="info" sx={bannerSx('info')}>
+        <AlertTitle>Not installed</AlertTitle>
+        No CloudNativePG components are installed in this cluster yet.
       </Alert>
     );
   }
@@ -581,6 +588,7 @@ function InstalledComponents({
   services: Service[] | null;
   onHealth?: (uid: string, health: PluginHealth) => void;
 }) {
+  const operatorInstalled = (pods ?? []).length > 0;
   return (
     <>
       <Box>
@@ -590,7 +598,7 @@ function InstalledComponents({
         <Divider />
       </Box>
       <Box display="grid" gap={2} sx={{ gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
-        <OperatorCard pods={pods} deployment={deployment} />
+        {operatorInstalled && <OperatorCard pods={pods} deployment={deployment} />}
         {(services ?? []).map(service => (
           <PluginCard key={service.metadata.uid} service={service} onHealth={onHealth} />
         ))}
@@ -631,6 +639,17 @@ export function OperatorStatus() {
   const loading =
     crds === null || operatorPods === null || deployments === null || services === null;
 
+  const { installed: certManagerInstalled, loading: certManagerLoading } =
+    useCertManagerStatus(crds);
+  const cnpgInstalled = (operatorPods ?? []).length > 0;
+  const pluginIds = new Set(
+    (services ?? []).map(s => s.metadata.labels?.[PLUGIN_LABEL] ?? s.getName())
+  );
+  const barmanInstalled = pluginIds.has(BARMAN_PLUGIN_ID);
+  const klioInstalled = pluginIds.has(KLIO_PLUGIN_ID);
+  const nothingInstalled =
+    !loading && !certManagerLoading && !cnpgInstalled && (services ?? []).length === 0;
+
   // Same page padding as the cluster details page, so the title doesn't hug the viewport edge.
   return (
     <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -652,7 +671,7 @@ export function OperatorStatus() {
             CloudNativePG
           </Typography>
           <Typography variant="subtitle1" color="textSecondary">
-            Operator Status
+            Operator &amp; Plugins Status
           </Typography>
         </Box>
       </Box>
@@ -666,20 +685,36 @@ export function OperatorStatus() {
           loading={loading}
         />
       </Box>
-      <Box display="grid" gap={2} sx={{ gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' } }}>
-        <OperatorSummaryCard
+      {(loading || cnpgInstalled) && (
+        <Box
+          display="grid"
+          gap={2}
+          sx={{ gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' } }}
+        >
+          <OperatorSummaryCard
+            pods={operatorPods}
+            deployment={deployments?.[0] ?? null}
+            loading={loading}
+          />
+          <PluginsSummaryCard services={services} health={pluginHealth} loading={loading} />
+          <ResourcesSummaryCard crds={crds} loading={loading} />
+        </Box>
+      )}
+      {!loading && !nothingInstalled && (
+        <InstalledComponents
           pods={operatorPods}
           deployment={deployments?.[0] ?? null}
-          loading={loading}
+          services={services}
+          onHealth={handlePluginHealth}
         />
-        <PluginsSummaryCard services={services} health={pluginHealth} loading={loading} />
-        <ResourcesSummaryCard crds={crds} loading={loading} />
-      </Box>
-      <InstalledComponents
-        pods={operatorPods}
-        deployment={deployments?.[0] ?? null}
-        services={services}
-        onHealth={handlePluginHealth}
+      )}
+      <InstallationWorkflow />
+      <ComponentCards
+        cnpgInstalled={cnpgInstalled}
+        certManagerInstalled={certManagerInstalled}
+        barmanInstalled={barmanInstalled}
+        klioInstalled={klioInstalled}
+        loading={loading || certManagerLoading}
       />
     </Box>
   );

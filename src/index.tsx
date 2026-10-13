@@ -64,7 +64,7 @@ registerSidebarEntry({
   name: 'cnpg-status',
   url: '/cnpg/status',
   parent: 'cnpg-root',
-  label: 'Status',
+  label: 'Operator Status',
 });
 
 registerSidebarEntry({
