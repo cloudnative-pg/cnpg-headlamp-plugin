@@ -362,9 +362,7 @@ function PrereqList({
         )}
         {namespace && namespace.exists === true && <NamespaceExistsNote name={namespace.name} />}
         {namespace && namespace.exists === false && (
-          <Box
-            sx={{ display: 'flex', gap: 1, mt: 1, alignItems: 'center', flexWrap: 'wrap' }}
-          >
+          <Box sx={{ display: 'flex', gap: 1, mt: 1, alignItems: 'center', flexWrap: 'wrap' }}>
             <NamespaceCreateButton key={namespace.name} name={namespace.name} />
             <Typography variant="caption" color="text.secondary">
               or
@@ -483,13 +481,21 @@ export function ComponentCards({
   const namespaceExists = (name: string): boolean | null =>
     namespaces === null ? null : namespaces.some(ns => ns.getName() === name);
 
+  // Installed components are hidden here — they already have their status in the
+  // "Installed components" section above. Nothing left to show when all are installed.
+  if (cnpgInstalled && certManagerInstalled && barmanInstalled && klioInstalled) {
+    return null;
+  }
+
   return (
     <Box>
       <Typography variant="h6" component="h2">
         Components
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Install the operator and optional backup plugins in just a few steps.
+        {cnpgInstalled && certManagerInstalled
+          ? 'Install the optional backup plugins in just a few steps.'
+          : 'Install the operator and optional backup plugins in just a few steps.'}
       </Typography>
       <Box
         display="grid"
@@ -503,260 +509,286 @@ export function ComponentCards({
         }}
       >
         {/* CloudNativePG operator */}
-        <Card variant="outlined" sx={{ height: '100%' }}>
-          <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <CardHeader
-              icon={<CnpgLogo size={40} />}
-              name="CloudNativePG"
-              subtitle="Operator"
-              installed={cnpgInstalled}
-              checking={loading}
-            />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-              Installs the CloudNativePG operator to manage PostgreSQL clusters.
-            </Typography>
-            <Box
-              sx={theme => ({
-                backgroundColor:
-                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f5f8fc',
-                borderRadius: 1,
-                p: 1.5,
-                mt: 1.5,
-              })}
-            >
-              <Typography variant="caption" fontWeight={700}>
-                What you&apos;ll get
-              </Typography>
-              <CheckList
-                items={[
-                  'Create and manage PostgreSQL clusters',
-                  'High availability and replication',
-                  'Health and observability',
-                ]}
+        {!cnpgInstalled && (
+          <Card variant="outlined" sx={{ height: '100%' }}>
+            <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <CardHeader
+                icon={<CnpgLogo size={40} />}
+                name="CloudNativePG"
+                subtitle="Operator"
+                installed={cnpgInstalled}
+                checking={loading}
               />
-            </Box>
-            <PrereqList
-              items={[
-                'Kubernetes cluster with appropriate permissions',
-                'Dedicated namespace (cnpg-system)',
-              ]}
-              namespace={{ name: 'cnpg-system', exists: namespaceExists('cnpg-system') }}
-            />
-            <Box sx={{ mt: 'auto', pt: 2 }}>
-              {cnpgInstalled ? (
-                <Button variant="outlined" disabled fullWidth startIcon={<Icon icon="mdi:check" />}>
-                  Installed
-                </Button>
-              ) : (
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<Icon icon="mdi:cube-outline" />}
-                  endIcon={<Icon icon="mdi:open-in-new" width={14} height={14} />}
-                  onClick={() => openAppCatalog(CHARTS.cnpg)}
-                >
-                  Install CloudNativePG
-                </Button>
-              )}
-              <LearnMoreRow docsUrl={DOC_URLS.cnpg} />
-            </Box>
-          </CardContent>
-        </Card>
-
-        {/* cert-manager */}
-        <Card variant="outlined" sx={{ height: '100%' }}>
-          <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <CardHeader
-              icon={<CircleIcon icon="mdi:anchor" />}
-              name="cert-manager"
-              subtitle="TLS certificate management"
-              installed={certManagerInstalled}
-              checking={loading}
-            />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-              Required by CloudNativePG and some plugins to manage TLS certificates.
-            </Typography>
-            <Box
-              sx={theme => ({
-                backgroundColor:
-                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f5f8fc',
-                borderRadius: 1,
-                p: 1.5,
-                mt: 1.5,
-              })}
-            >
-              <Typography variant="caption" fontWeight={700}>
-                What you&apos;ll get
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                Installs the CloudNativePG operator to manage PostgreSQL clusters.
               </Typography>
-              <CheckList
+              <Box
+                sx={theme => ({
+                  backgroundColor:
+                    theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f5f8fc',
+                  borderRadius: 1,
+                  p: 1.5,
+                  mt: 1.5,
+                })}
+              >
+                <Typography variant="caption" fontWeight={700}>
+                  What you&apos;ll get
+                </Typography>
+                <CheckList
+                  items={[
+                    'Create and manage PostgreSQL clusters',
+                    'High availability and replication',
+                    'Health and observability',
+                  ]}
+                />
+              </Box>
+              <PrereqList
                 items={[
-                  'Automatic certificate issuance',
-                  'Certificate renewal',
-                  'Integration with Kubernetes',
+                  'Kubernetes cluster with appropriate permissions',
+                  'Dedicated namespace (cnpg-system)',
                 ]}
+                namespace={{ name: 'cnpg-system', exists: namespaceExists('cnpg-system') }}
               />
-            </Box>
-            <PrereqList
-              items={[
-                'Helm (official chart)',
-                'Dedicated namespace (cert-manager)',
-                'Access to the App Catalog',
-              ]}
-              namespace={{ name: 'cert-manager', exists: namespaceExists('cert-manager') }}
-            />
-            <RequiredValuesNote values={'crds:\n  enabled: true'} />
-            <Box sx={{ mt: 'auto', pt: 2 }}>
-              {certManagerInstalled ? (
-                <Button variant="outlined" disabled fullWidth startIcon={<Icon icon="mdi:check" />}>
-                  Installed
-                </Button>
-              ) : (
-                <Tooltip title="Opens the official cert-manager chart in the Headlamp App Catalog (available in Headlamp Desktop).">
+              <Box sx={{ mt: 'auto', pt: 2 }}>
+                {cnpgInstalled ? (
+                  <Button
+                    variant="outlined"
+                    disabled
+                    fullWidth
+                    startIcon={<Icon icon="mdi:check" />}
+                  >
+                    Installed
+                  </Button>
+                ) : (
                   <Button
                     variant="outlined"
                     fullWidth
+                    startIcon={<Icon icon="mdi:cube-outline" />}
                     endIcon={<Icon icon="mdi:open-in-new" width={14} height={14} />}
-                    onClick={() => openAppCatalog(CHARTS.certManager)}
+                    onClick={() => openAppCatalog(CHARTS.cnpg)}
                   >
-                    Install via App Catalog
+                    Install CloudNativePG
                   </Button>
-                </Tooltip>
-              )}
-              <LearnMoreRow docsUrl={DOC_URLS.certManager} />
-            </Box>
-          </CardContent>
-        </Card>
+                )}
+                <LearnMoreRow docsUrl={DOC_URLS.cnpg} />
+              </Box>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Barman Cloud plugin */}
-        <Card variant="outlined" sx={{ height: '100%' }}>
-          <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <CardHeader
-              icon={<CircleIcon icon="mdi:cloud-upload-outline" />}
-              name="Barman Cloud"
-              subtitle="Backup and recovery plugin"
-              installed={barmanInstalled}
-              checking={loading}
-            />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-              Integrates PostgreSQL backups with object storage using Barman Cloud.
-            </Typography>
-            <Box
-              sx={theme => ({
-                backgroundColor:
-                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f5f8fc',
-                borderRadius: 1,
-                p: 1.5,
-                mt: 1.5,
-              })}
-            >
-              <Typography variant="caption" fontWeight={700}>
-                What you&apos;ll get
-              </Typography>
-              <CheckList
-                items={[
-                  'Automated backups and retention',
-                  'Restore from object storage',
-                  'Backup monitoring and status',
-                ]}
+        {/* cert-manager */}
+        {!certManagerInstalled && (
+          <Card variant="outlined" sx={{ height: '100%' }}>
+            <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <CardHeader
+                icon={<CircleIcon icon="mdi:anchor" />}
+                name="cert-manager"
+                subtitle="TLS certificate management"
+                installed={certManagerInstalled}
+                checking={loading}
               />
-            </Box>
-            <PrereqList
-              items={[
-                'CloudNativePG installed',
-                'cert-manager installed',
-                'Same namespace as the operator (cnpg-system)',
-              ]}
-            />
-            <Box sx={{ mt: 'auto', pt: 2 }}>
-              {barmanInstalled ? (
-                <Button variant="outlined" disabled fullWidth startIcon={<Icon icon="mdi:check" />}>
-                  Installed
-                </Button>
-              ) : (
-                <Tooltip
-                  title={
-                    barmanBlocked
-                      ? 'Install CloudNativePG and cert-manager first — the Barman Cloud chart needs them to issue its TLS certificates.'
-                      : 'Opens the official Barman Cloud plugin chart in the Headlamp App Catalog.'
-                  }
-                >
-                  {/* Tooltip needs a non-disabled wrapper to fire while the button is disabled. */}
-                  <span>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                Required by CloudNativePG and some plugins to manage TLS certificates.
+              </Typography>
+              <Box
+                sx={theme => ({
+                  backgroundColor:
+                    theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f5f8fc',
+                  borderRadius: 1,
+                  p: 1.5,
+                  mt: 1.5,
+                })}
+              >
+                <Typography variant="caption" fontWeight={700}>
+                  What you&apos;ll get
+                </Typography>
+                <CheckList
+                  items={[
+                    'Automatic certificate issuance',
+                    'Certificate renewal',
+                    'Integration with Kubernetes',
+                  ]}
+                />
+              </Box>
+              <PrereqList
+                items={[
+                  'Helm (official chart)',
+                  'Dedicated namespace (cert-manager)',
+                  'Access to the App Catalog',
+                ]}
+                namespace={{ name: 'cert-manager', exists: namespaceExists('cert-manager') }}
+              />
+              <RequiredValuesNote values={'crds:\n  enabled: true'} />
+              <Box sx={{ mt: 'auto', pt: 2 }}>
+                {certManagerInstalled ? (
+                  <Button
+                    variant="outlined"
+                    disabled
+                    fullWidth
+                    startIcon={<Icon icon="mdi:check" />}
+                  >
+                    Installed
+                  </Button>
+                ) : (
+                  <Tooltip title="Opens the official cert-manager chart in the Headlamp App Catalog (available in Headlamp Desktop).">
                     <Button
                       variant="outlined"
                       fullWidth
-                      disabled={barmanBlocked}
                       endIcon={<Icon icon="mdi:open-in-new" width={14} height={14} />}
-                      onClick={() => openAppCatalog(CHARTS.barman)}
+                      onClick={() => openAppCatalog(CHARTS.certManager)}
                     >
                       Install via App Catalog
                     </Button>
-                  </span>
-                </Tooltip>
-              )}
-              <LearnMoreRow docsUrl={DOC_URLS.barman} />
-            </Box>
-          </CardContent>
-        </Card>
+                  </Tooltip>
+                )}
+                <LearnMoreRow docsUrl={DOC_URLS.certManager} />
+              </Box>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Klio plugin (coming soon) */}
-        <Card variant="outlined" sx={{ height: '100%' }}>
-          <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <CardHeader
-              icon={<CircleIcon icon="mdi:database" />}
-              name="Klio"
-              subtitle="Multi-tiered backup and recovery"
-              installed={klioInstalled}
-              checking={loading}
-            />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-              Klio provides advanced backup and recovery workflows with multi-tiered storage.
-            </Typography>
-            <Box
-              sx={theme => ({
-                backgroundColor:
-                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f5f8fc',
-                borderRadius: 1,
-                p: 1.5,
-                mt: 1.5,
-              })}
-            >
-              <Typography variant="caption" fontWeight={700}>
-                What you&apos;ll get
+        {/* Barman Cloud plugin */}
+        {!barmanInstalled && (
+          <Card variant="outlined" sx={{ height: '100%' }}>
+            <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <CardHeader
+                icon={<CircleIcon icon="mdi:cloud-upload-outline" />}
+                name="Barman Cloud"
+                subtitle="Backup and recovery plugin"
+                installed={barmanInstalled}
+                checking={loading}
+              />
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                Integrates PostgreSQL backups with object storage using Barman Cloud.
               </Typography>
-              <CheckList
+              <Box
+                sx={theme => ({
+                  backgroundColor:
+                    theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f5f8fc',
+                  borderRadius: 1,
+                  p: 1.5,
+                  mt: 1.5,
+                })}
+              >
+                <Typography variant="caption" fontWeight={700}>
+                  What you&apos;ll get
+                </Typography>
+                <CheckList
+                  items={[
+                    'Automated backups and retention',
+                    'Restore from object storage',
+                    'Backup monitoring and status',
+                  ]}
+                />
+              </Box>
+              <PrereqList
                 items={[
-                  'Multi-tiered backup strategies',
-                  'Point-in-time recovery',
-                  'Backup lifecycle management',
+                  'CloudNativePG installed',
+                  'cert-manager installed',
+                  'Same namespace as the operator (cnpg-system)',
                 ]}
               />
-            </Box>
-            <PrereqList
-              items={['CloudNativePG installed', 'cert-manager installed']}
-            />
-            <Box sx={{ mt: 'auto', pt: 2 }}>
-              {klioInstalled ? (
-                <Button variant="outlined" disabled fullWidth startIcon={<Icon icon="mdi:check" />}>
-                  Installed
-                </Button>
-              ) : (
-                <Button
-                  variant="outlined"
-                  disabled
-                  fullWidth
-                  endIcon={<Icon icon="mdi:open-in-new" width={14} height={14} />}
-                >
-                  Coming soon
-                </Button>
-              )}
-              <LearnMoreRow
-                docsUrl={DOC_URLS.klio}
-                extra={{ label: 'Klio Helm chart documentation', href: DOC_URLS.klio }}
+              <Box sx={{ mt: 'auto', pt: 2 }}>
+                {barmanInstalled ? (
+                  <Button
+                    variant="outlined"
+                    disabled
+                    fullWidth
+                    startIcon={<Icon icon="mdi:check" />}
+                  >
+                    Installed
+                  </Button>
+                ) : (
+                  <Tooltip
+                    title={
+                      barmanBlocked
+                        ? 'Install CloudNativePG and cert-manager first — the Barman Cloud chart needs them to issue its TLS certificates.'
+                        : 'Opens the official Barman Cloud plugin chart in the Headlamp App Catalog.'
+                    }
+                  >
+                    {/* Tooltip needs a non-disabled wrapper to fire while the button is disabled. */}
+                    <span>
+                      <Button
+                        variant="outlined"
+                        fullWidth
+                        disabled={barmanBlocked}
+                        endIcon={<Icon icon="mdi:open-in-new" width={14} height={14} />}
+                        onClick={() => openAppCatalog(CHARTS.barman)}
+                      >
+                        Install via App Catalog
+                      </Button>
+                    </span>
+                  </Tooltip>
+                )}
+                <LearnMoreRow docsUrl={DOC_URLS.barman} />
+              </Box>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Klio plugin (coming soon) */}
+        {!klioInstalled && (
+          <Card variant="outlined" sx={{ height: '100%' }}>
+            <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <CardHeader
+                icon={<CircleIcon icon="mdi:database" />}
+                name="Klio"
+                subtitle="Multi-tiered backup and recovery"
+                installed={klioInstalled}
+                checking={loading}
               />
-            </Box>
-          </CardContent>
-        </Card>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                Klio provides advanced backup and recovery workflows with multi-tiered storage.
+              </Typography>
+              <Box
+                sx={theme => ({
+                  backgroundColor:
+                    theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f5f8fc',
+                  borderRadius: 1,
+                  p: 1.5,
+                  mt: 1.5,
+                })}
+              >
+                <Typography variant="caption" fontWeight={700}>
+                  What you&apos;ll get
+                </Typography>
+                <CheckList
+                  items={[
+                    'Multi-tiered backup strategies',
+                    'Point-in-time recovery',
+                    'Backup lifecycle management',
+                  ]}
+                />
+              </Box>
+              <PrereqList items={['CloudNativePG installed', 'cert-manager installed']} />
+              <Box sx={{ mt: 'auto', pt: 2 }}>
+                {klioInstalled ? (
+                  <Button
+                    variant="outlined"
+                    disabled
+                    fullWidth
+                    startIcon={<Icon icon="mdi:check" />}
+                  >
+                    Installed
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outlined"
+                    disabled
+                    fullWidth
+                    endIcon={<Icon icon="mdi:open-in-new" width={14} height={14} />}
+                  >
+                    Coming soon
+                  </Button>
+                )}
+                <LearnMoreRow
+                  docsUrl={DOC_URLS.klio}
+                  extra={{ label: 'Klio Helm chart documentation', href: DOC_URLS.klio }}
+                />
+              </Box>
+            </CardContent>
+          </Card>
+        )}
       </Box>
     </Box>
   );

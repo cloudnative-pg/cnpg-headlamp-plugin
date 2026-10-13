@@ -603,12 +603,6 @@ function InstalledComponents({
           <PluginCard key={service.metadata.uid} service={service} onHealth={onHealth} />
         ))}
       </Box>
-      {services !== null && services.length === 0 && (
-        <StatusLabel status="">
-          No Service carrying a {PLUGIN_LABEL} label was found — no CNPG-i plugins (e.g. Barman
-          Cloud) appear to be installed.
-        </StatusLabel>
-      )}
     </>
   );
 }
@@ -649,6 +643,9 @@ export function OperatorStatus() {
   const klioInstalled = pluginIds.has(KLIO_PLUGIN_ID);
   const nothingInstalled =
     !loading && !certManagerLoading && !cnpgInstalled && (services ?? []).length === 0;
+  // The workflow's guided setup (operator + cert-manager) is done once both are present —
+  // remaining plugins are covered by the Components section below.
+  const coreInstalled = cnpgInstalled && certManagerInstalled;
 
   // Same page padding as the cluster details page, so the title doesn't hug the viewport edge.
   return (
@@ -708,7 +705,7 @@ export function OperatorStatus() {
           onHealth={handlePluginHealth}
         />
       )}
-      <InstallationWorkflow />
+      {!loading && !coreInstalled && <InstallationWorkflow />}
       <ComponentCards
         cnpgInstalled={cnpgInstalled}
         certManagerInstalled={certManagerInstalled}
