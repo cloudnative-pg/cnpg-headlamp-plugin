@@ -90,6 +90,24 @@ List and detail views for managing available Postgres operand images.
 1. Download the `cnpg-headlamp-plugin-<version>.tar.gz` archive from the [GitHub Releases](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases) page
 2. Install it following the [Headlamp plugin installation documentation](https://headlamp.dev/docs/latest/development/plugins/)
 
+### In-Clusterr install
+
+1. Install Headlamp (https://headlamp.dev/docs/latest/installation/in-cluster/)
+2. Deploy the container image `ghcr.io/cloudnative-pg/cnpg-headlamp-plugin` as a sidecar container to the headlamp deployment.
+
+```yaml
+initContainers:
+  - command:
+      - /bin/sh
+      - '-c'
+      - mkdir -p /build/plugins && cp -r /plugins/* /build/plugins/
+    image: ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:v0.1.4
+    name: cnpg-plugin
+    volumeMounts:
+      - mountPath: /build/plugins
+        name: headlamp-plugins
+```
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, the live-load
