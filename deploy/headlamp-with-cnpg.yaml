@@ -1,0 +1,56 @@
+# Example: run Headlamp in-cluster with the CNPG plugin installed.
+#
+# Replace vX.Y.Z below with a released plugin version, e.g. v0.1.4:
+# https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: headlamp-with-cnpg
+  labels:
+    app: headlamp-with-cnpg
+spec:
+  selector:
+    matchLabels:
+      app: headlamp-with-cnpg
+  template:
+    metadata:
+      labels:
+        app: headlamp-with-cnpg
+    spec:
+      initContainers:
+        - name: fetch-plugins
+          image: ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:vX.Y.Z
+          # Copy the plugins into the shared volume before Headlamp starts.
+          command: ["/bin/sh", "-c"]
+          args: ["cp -r /plugins/* /headlamp/plugins/ && ls -l /headlamp/plugins"]
+          volumeMounts:
+            - name: plugins
+              mountPath: /headlamp/plugins
+      containers:
+        - name: headlamp
+          image: ghcr.io/headlamp-k8s/headlamp:latest
+          args:
+            - -plugins-dir=/headlamp/plugins
+            - -in-cluster
+          ports:
+            - containerPort: 4466
+          volumeMounts:
+            - name: plugins
+              mountPath: /headlamp/plugins
+      volumes:
+        - name: plugins
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: headlamp-with-cnpg
+  labels:
+    app: headlamp-with-cnpg
+spec:
+  selector:
+    app: headlamp-with-cnpg
+  ports:
+    - name: http
+      port: 4466
+      targetPort: 4466
