@@ -1,6 +1,7 @@
 # Example: run Headlamp in-cluster with the CNPG plugin installed.
 #
-# Replace vX.Y.Z below with a released plugin version, e.g. v0.1.4:
+# The plugin image is pinned to the latest release and bumped automatically
+# by release-please. See the available versions at:
 # https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases
 apiVersion: apps/v1
 kind: Deployment
@@ -19,7 +20,7 @@ spec:
     spec:
       initContainers:
         - name: fetch-plugins
-          image: ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:vX.Y.Z
+          image: ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:v0.1.4 # x-release-please-version
           # Copy the plugins into the shared volume before Headlamp starts.
           command: ["/bin/sh", "-c"]
           args: ["cp -r /plugins/* /headlamp/plugins/ && ls -l /headlamp/plugins"]
