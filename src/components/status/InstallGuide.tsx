@@ -24,6 +24,27 @@ const CERT_MANAGER_LABEL = 'app.kubernetes.io/name=cert-manager';
 export const BARMAN_PLUGIN_ID = 'barman-cloud.cloudnative-pg.io';
 export const KLIO_PLUGIN_ID = 'klio.cnpg.io';
 
+/** Label marking namespaces created from this plugin's install guide, so a
+ *  custom namespace stays visible after creation (and across reloads). */
+export const NAMESPACE_CREATED_FOR_LABEL = 'cnpg-headlamp-plugin.io/created-for';
+export const CNPG_CREATED_FOR = 'cloudnative-pg';
+export const CERT_MANAGER_CREATED_FOR = 'cert-manager';
+
+/** Pure helper, kept outside the hook so it stays unit-testable without a cluster. */
+export function getCustomCreatedNamespaces(
+  namespaces: { getName(): string; metadata?: { labels?: Record<string, string> } | null }[],
+  createdFor: string,
+  defaultName: string
+): string[] {
+  return namespaces
+    .filter(
+      ns =>
+        ns.getName() !== defaultName &&
+        ns.metadata?.labels?.[NAMESPACE_CREATED_FOR_LABEL] === createdFor
+    )
+    .map(ns => ns.getName());
+}
+
 // Deep links into the Headlamp App Catalog's chart-detail route
 // (/helm/:repoName/charts/:chartName), which resolves the official, CNCF-published charts via
 // ArtifactHub. When the App Catalog route isn't registered (e.g. Headlamp running without the
@@ -150,7 +171,7 @@ function CheckList({ items }: { items: string[] }) {
   );
 }
 
-function NamespaceCreateButton({ name }: { name: string }) {
+function NamespaceCreateButton({ name, createdFor }: { name: string; createdFor: string }) {
   const { enqueueSnackbar } = useSnackbar();
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(false);
@@ -173,7 +194,11 @@ function NamespaceCreateButton({ name }: { name: string }) {
         onClick={() => {
           setCreating(true);
           NamespaceClass.apiEndpoint
-            .post({ apiVersion: 'v1', kind: 'Namespace', metadata: { name } })
+            .post({
+              apiVersion: 'v1',
+              kind: 'Namespace',
+              metadata: { name, labels: { [NAMESPACE_CREATED_FOR_LABEL]: createdFor } },
+            })
             .then(() => {
               setCreated(true);
               enqueueSnackbar(`Namespace "${name}" created`, { variant: 'success' });
@@ -206,14 +231,14 @@ function NamespaceExistsNote({ name }: { name: string }) {
         <Icon icon="mdi:check-circle" width={16} height={16} />
       </Box>
       <Typography variant="caption" color="text.secondary">
-        Namespace &quot;{name}&quot; exists
+        Namespace &quot;{name}&quot; ready — select it when installing
       </Typography>
     </Box>
   );
 }
 
 /** Lets the user type a custom namespace name and create it directly in Headlamp. */
-function CustomNamespaceCreate() {
+function CustomNamespaceCreate({ createdFor }: { createdFor: string }) {
   const { enqueueSnackbar } = useSnackbar();
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -256,7 +281,14 @@ function CustomNamespaceCreate() {
           onClick={() => {
             setCreating(true);
             NamespaceClass.apiEndpoint
-              .post({ apiVersion: 'v1', kind: 'Namespace', metadata: { name: trimmed } })
+              .post({
+                apiVersion: 'v1',
+                kind: 'Namespace',
+                metadata: {
+                  name: trimmed,
+                  labels: { [NAMESPACE_CREATED_FOR_LABEL]: createdFor },
+                },
+              })
               .then(() => {
                 setCreating(false);
                 setName('');
@@ -333,11 +365,19 @@ function RequiredValuesNote({ values }: { values: string }) {
 function PrereqList({
   items,
   namespace,
+  createdFor,
+  customNamespaces = [],
 }: {
   items: string[];
   /** Suggested namespace: offers one-click creation in Headlamp (no kubectl needed), or a
    *  confirmation when it already exists. `exists: null` while the namespace list loads. */
   namespace?: { name: string; exists: boolean | null };
+  /** Value for the {@link NAMESPACE_CREATED_FOR_LABEL} label: tracks custom namespaces
+   *  created from this card so they stay visible after creation. */
+  createdFor?: string;
+  /** Namespaces previously created from this card via the custom-namespace input
+   *  (labelled, excluding the suggested name which has its own note). */
+  customNamespaces?: string[];
 }) {
   return (
     <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
@@ -361,13 +401,20 @@ function PrereqList({
           </Typography>
         )}
         {namespace && namespace.exists === true && <NamespaceExistsNote name={namespace.name} />}
-        {namespace && namespace.exists === false && (
+        {customNamespaces.map(name => (
+          <NamespaceExistsNote key={name} name={name} />
+        ))}
+        {namespace && namespace.exists === false && customNamespaces.length === 0 && (
           <Box sx={{ display: 'flex', gap: 1, mt: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-            <NamespaceCreateButton key={namespace.name} name={namespace.name} />
+            <NamespaceCreateButton
+              key={namespace.name}
+              name={namespace.name}
+              createdFor={createdFor ?? namespace.name}
+            />
             <Typography variant="caption" color="text.secondary">
               or
             </Typography>
-            <CustomNamespaceCreate />
+            <CustomNamespaceCreate createdFor={createdFor ?? namespace.name} />
           </Box>
         )}
       </Box>
@@ -425,13 +472,7 @@ function CircleIcon({ icon }: { icon: string }) {
   );
 }
 
-function LearnMoreRow({
-  docsUrl,
-  extra,
-}: {
-  docsUrl: string;
-  extra?: { label: string; href: string };
-}) {
+function LearnMoreRow({ docsUrl }: { docsUrl: string }) {
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1.5 }}>
       <Link
@@ -444,18 +485,6 @@ function LearnMoreRow({
       >
         Learn more <Icon icon="mdi:open-in-new" width={12} height={12} />
       </Link>
-      {extra && (
-        <Link
-          href={extra.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          variant="caption"
-          underline="hover"
-          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
-        >
-          {extra.label} <Icon icon="mdi:open-in-new" width={12} height={12} />
-        </Link>
-      )}
     </Box>
   );
 }
@@ -466,12 +495,18 @@ export function ComponentCards({
   barmanInstalled,
   klioInstalled,
   loading,
+  operatorNamespace,
 }: {
   cnpgInstalled: boolean;
   certManagerInstalled: boolean;
   barmanInstalled: boolean;
   klioInstalled: boolean;
   loading: boolean;
+  /** Actual namespace the operator pods run in — the plugins must live in the same one
+   *  to work. Derived from the live pods, not from the namespaces created above
+   *  (the operator may have been installed anywhere via the App Catalog). Null while
+   *  the operator isn't installed or its pods haven't loaded. */
+  operatorNamespace: string | null;
 }) {
   const openAppCatalog = useOpenAppCatalog();
   // Barman Cloud requires both the operator and cert-manager (its chart issues TLS
@@ -480,12 +515,18 @@ export function ComponentCards({
   const [namespaces] = K8s.ResourceClasses.Namespace.useList();
   const namespaceExists = (name: string): boolean | null =>
     namespaces === null ? null : namespaces.some(ns => ns.getName() === name);
+  const customNamespacesFor = (createdFor: string, defaultName: string): string[] =>
+    namespaces === null ? [] : getCustomCreatedNamespaces(namespaces, createdFor, defaultName);
 
-  // Installed components are hidden here — they already have their status in the
-  // "Installed components" section above. Nothing left to show when all are installed.
-  if (cnpgInstalled && certManagerInstalled && barmanInstalled && klioInstalled) {
-    return null;
-  }
+  // All four cards stay on screen in the Installation tab with their install status
+  // (Installed vs install action) — a stable inventory that mirrors the workflow steps
+  // above, instead of cards vanishing as each component gets installed.
+  // Both CNPG-I plugins must run in the operator's own namespace — derived from the
+  // live operator pods, since the App Catalog lets the operator land in any namespace,
+  // not just the ones created above.
+  const sameNamespaceItem = operatorNamespace
+    ? `Same namespace as the operator ("${operatorNamespace}") — select it when installing`
+    : 'Same namespace as the operator — install the plugin where you installed the operator';
 
   return (
     <Box>
@@ -509,8 +550,7 @@ export function ComponentCards({
         }}
       >
         {/* CloudNativePG operator */}
-        {!cnpgInstalled && (
-          <Card variant="outlined" sx={{ height: '100%' }}>
+        <Card variant="outlined" sx={{ height: '100%' }}>
             <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <CardHeader
                 icon={<CnpgLogo size={40} />}
@@ -542,13 +582,17 @@ export function ComponentCards({
                   ]}
                 />
               </Box>
-              <PrereqList
-                items={[
-                  'Kubernetes cluster with appropriate permissions',
-                  'Dedicated namespace (cnpg-system)',
-                ]}
-                namespace={{ name: 'cnpg-system', exists: namespaceExists('cnpg-system') }}
-              />
+              {!cnpgInstalled && (
+                <PrereqList
+                  items={[
+                    'Kubernetes cluster with appropriate permissions',
+                    'Dedicated namespace (cnpg-system)',
+                  ]}
+                  namespace={{ name: 'cnpg-system', exists: namespaceExists('cnpg-system') }}
+                  createdFor={CNPG_CREATED_FOR}
+                  customNamespaces={customNamespacesFor(CNPG_CREATED_FOR, 'cnpg-system')}
+                />
+              )}
               <Box sx={{ mt: 'auto', pt: 2 }}>
                 {cnpgInstalled ? (
                   <Button
@@ -574,11 +618,9 @@ export function ComponentCards({
               </Box>
             </CardContent>
           </Card>
-        )}
 
         {/* cert-manager */}
-        {!certManagerInstalled && (
-          <Card variant="outlined" sx={{ height: '100%' }}>
+        <Card variant="outlined" sx={{ height: '100%' }}>
             <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <CardHeader
                 icon={<CircleIcon icon="mdi:anchor" />}
@@ -610,15 +652,24 @@ export function ComponentCards({
                   ]}
                 />
               </Box>
-              <PrereqList
-                items={[
-                  'Helm (official chart)',
-                  'Dedicated namespace (cert-manager)',
-                  'Access to the App Catalog',
-                ]}
-                namespace={{ name: 'cert-manager', exists: namespaceExists('cert-manager') }}
-              />
-              <RequiredValuesNote values={'crds:\n  enabled: true'} />
+              {!certManagerInstalled && (
+                <>
+                  <PrereqList
+                    items={[
+                      'Helm (official chart)',
+                      'Dedicated namespace (cert-manager)',
+                      'Access to the App Catalog',
+                    ]}
+                    namespace={{ name: 'cert-manager', exists: namespaceExists('cert-manager') }}
+                    createdFor={CERT_MANAGER_CREATED_FOR}
+                    customNamespaces={customNamespacesFor(
+                      CERT_MANAGER_CREATED_FOR,
+                      'cert-manager'
+                    )}
+                  />
+                  <RequiredValuesNote values={'crds:\n  enabled: true'} />
+                </>
+              )}
               <Box sx={{ mt: 'auto', pt: 2 }}>
                 {certManagerInstalled ? (
                   <Button
@@ -645,11 +696,9 @@ export function ComponentCards({
               </Box>
             </CardContent>
           </Card>
-        )}
 
         {/* Barman Cloud plugin */}
-        {!barmanInstalled && (
-          <Card variant="outlined" sx={{ height: '100%' }}>
+        <Card variant="outlined" sx={{ height: '100%' }}>
             <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <CardHeader
                 icon={<CircleIcon icon="mdi:cloud-upload-outline" />}
@@ -681,13 +730,15 @@ export function ComponentCards({
                   ]}
                 />
               </Box>
-              <PrereqList
-                items={[
-                  'CloudNativePG installed',
-                  'cert-manager installed',
-                  'Same namespace as the operator (cnpg-system)',
-                ]}
-              />
+              {!barmanInstalled && (
+                <PrereqList
+                  items={[
+                    'CloudNativePG installed',
+                    'cert-manager installed',
+                    sameNamespaceItem,
+                  ]}
+                />
+              )}
               <Box sx={{ mt: 'auto', pt: 2 }}>
                 {barmanInstalled ? (
                   <Button
@@ -703,6 +754,8 @@ export function ComponentCards({
                     title={
                       barmanBlocked
                         ? 'Install CloudNativePG and cert-manager first — the Barman Cloud chart needs them to issue its TLS certificates.'
+                        : operatorNamespace
+                        ? `Opens the official Barman Cloud plugin chart in the Headlamp App Catalog. Install it into "${operatorNamespace}" — the same namespace as the operator.`
                         : 'Opens the official Barman Cloud plugin chart in the Headlamp App Catalog.'
                     }
                   >
@@ -724,11 +777,9 @@ export function ComponentCards({
               </Box>
             </CardContent>
           </Card>
-        )}
 
         {/* Klio plugin (coming soon) */}
-        {!klioInstalled && (
-          <Card variant="outlined" sx={{ height: '100%' }}>
+        <Card variant="outlined" sx={{ height: '100%' }}>
             <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <CardHeader
                 icon={<CircleIcon icon="mdi:database" />}
@@ -760,7 +811,15 @@ export function ComponentCards({
                   ]}
                 />
               </Box>
-              <PrereqList items={['CloudNativePG installed', 'cert-manager installed']} />
+              {!klioInstalled && (
+                <PrereqList
+                  items={[
+                    'CloudNativePG installed',
+                    'cert-manager installed',
+                    sameNamespaceItem,
+                  ]}
+                />
+              )}
               <Box sx={{ mt: 'auto', pt: 2 }}>
                 {klioInstalled ? (
                   <Button
@@ -781,14 +840,10 @@ export function ComponentCards({
                     Coming soon
                   </Button>
                 )}
-                <LearnMoreRow
-                  docsUrl={DOC_URLS.klio}
-                  extra={{ label: 'Klio Helm chart documentation', href: DOC_URLS.klio }}
-                />
+                <LearnMoreRow docsUrl={DOC_URLS.klio} />
               </Box>
             </CardContent>
           </Card>
-        )}
       </Box>
     </Box>
   );
@@ -799,19 +854,26 @@ function WorkflowStep({
   icon,
   title,
   description,
-  action,
-  actionLabel,
-  onAction,
+  completed,
+  optional,
 }: {
   number: number;
   icon: string;
   title: string;
   description: string;
-  /** Custom action node (takes precedence over actionLabel/onAction). */
-  action?: React.ReactNode;
-  actionLabel?: string;
-  onAction?: () => void;
+  /** Required step done: green circle with check plus a disabled "Installed" marker.
+   *  Optional steps keep their action affordance on the component cards below, so a
+   *  completed optional step shows green but no button here. */
+  completed?: boolean;
+  /** Optional, open-ended steps (like backup plugins) can never be "done" — they render
+   *  with an outlined badge and an "Optional" tag instead of todo-blue, so they don't nag
+   *  like unfinished required steps. `completed` still wins when explicitly set. */
+  optional?: boolean;
 }) {
+  const badgeBg = completed ? '#2e7d32' : optional ? 'transparent' : '#1565c0';
+  const badgeFg = completed ? '#fff' : '#1565c0';
+  const badgeBorder = !completed && optional ? '2px solid #1565c0' : 'none';
+  const iconTone = completed ? '#2e7d32' : '#1565c0';
   return (
     <Box sx={{ flex: '1 1 180px', minWidth: 170, maxWidth: 260 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
@@ -824,41 +886,57 @@ function WorkflowStep({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: '#1565c0',
-            color: '#fff',
+            backgroundColor: badgeBg,
+            color: badgeFg,
+            border: badgeBorder,
             fontWeight: 700,
             fontSize: 14,
           }}
         >
-          {number}
+          {completed ? <Icon icon="mdi:check" width={18} height={18} /> : number}
         </Box>
-        <Box sx={{ color: '#1565c0', display: 'flex' }}>
+        <Box sx={{ color: iconTone, display: 'flex' }}>
           <Icon icon={icon} width={28} height={28} />
         </Box>
       </Box>
-      <Typography variant="subtitle2" fontWeight={700}>
-        {title}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: action || actionLabel ? 1 : 0 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+        <Typography variant="subtitle2" fontWeight={700}>
+          {title}
+        </Typography>
+        {optional && !completed && <Chip label="Optional" size="small" variant="outlined" />}
+      </Box>
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ mb: completed && !optional ? 1 : 0 }}
+      >
         {description}
       </Typography>
-      {action ??
-        (actionLabel && (
-          <Button
-            variant="outlined"
-            size="small"
-            endIcon={<Icon icon="mdi:open-in-new" width={12} height={12} />}
-            onClick={onAction}
-          >
-            {actionLabel}
-          </Button>
-        ))}
+      {completed && !optional && (
+        <Button variant="outlined" size="small" disabled startIcon={<Icon icon="mdi:check" />}>
+          Installed
+        </Button>
+      )}
     </Box>
   );
 }
 
-export function InstallationWorkflow() {
-  const openAppCatalog = useOpenAppCatalog();
+export function InstallationWorkflow({
+  cnpgInstalled = false,
+  certManagerInstalled = false,
+  barmanInstalled = false,
+  klioInstalled = false,
+}: {
+  cnpgInstalled?: boolean;
+  certManagerInstalled?: boolean;
+  barmanInstalled?: boolean;
+  klioInstalled?: boolean;
+}) {
+  // Both plugins on offer are backup plugins — "backup plugins" scopes the step to what
+  // it actually covers. Any-of is the honest heuristic for optional: green once the user
+  // has backup coverage. Actions live only on the component cards below (namespace
+  // creation, values, blocked-state) — the workflow is a progress strip, not a launcher.
+  const backupPluginInstalled = barmanInstalled || klioInstalled;
 
   return (
     <Box
@@ -885,51 +963,31 @@ export function InstallationWorkflow() {
       >
         <WorkflowStep
           number={1}
-          icon="mdi:shield-check-outline"
-          title="Check prerequisites"
-          description="Verify cluster access, required permissions, target namespaces (cnpg-system, cert-manager) and dependencies."
+          icon="mdi:elephant"
+          title="Install CloudNativePG"
+          description="Install the operator using the Headlamp App Catalog."
+          completed={cnpgInstalled}
         />
         <Box sx={{ color: 'text.disabled', pt: 1, display: { xs: 'none', lg: 'block' } }}>
           <Icon icon="mdi:arrow-right" width={20} height={20} />
         </Box>
         <WorkflowStep
           number={2}
-          icon="mdi:elephant"
-          title="Install CloudNativePG"
-          description="Install the operator using the Headlamp App Catalog."
-          actionLabel="Open App Catalog"
-          onAction={() => openAppCatalog(CHARTS.cnpg)}
+          icon="mdi:anchor"
+          title="Install cert-manager"
+          description="Open the Headlamp App Catalog and install the official cert-manager chart."
+          completed={certManagerInstalled}
         />
         <Box sx={{ color: 'text.disabled', pt: 1, display: { xs: 'none', lg: 'block' } }}>
           <Icon icon="mdi:arrow-right" width={20} height={20} />
         </Box>
         <WorkflowStep
           number={3}
-          icon="mdi:anchor"
-          title="Install cert-manager"
-          description="Open the Headlamp App Catalog and install the official cert-manager chart."
-          actionLabel="Open App Catalog"
-          onAction={() => openAppCatalog(CHARTS.certManager)}
-        />
-        <Box sx={{ color: 'text.disabled', pt: 1, display: { xs: 'none', lg: 'block' } }}>
-          <Icon icon="mdi:arrow-right" width={20} height={20} />
-        </Box>
-        <WorkflowStep
-          number={4}
           icon="mdi:cloud-upload-outline"
-          title="Install plugins (optional)"
-          description="Add Barman Cloud or Klio once the prerequisites are met."
-          actionLabel="Open App Catalog"
-          onAction={() => openAppCatalog(CHARTS.barman)}
-        />
-        <Box sx={{ color: 'text.disabled', pt: 1, display: { xs: 'none', lg: 'block' } }}>
-          <Icon icon="mdi:arrow-right" width={20} height={20} />
-        </Box>
-        <WorkflowStep
-          number={5}
-          icon="mdi:check-circle-outline"
-          title="Verify readiness"
-          description="Check resources and plugin registration."
+          title="Install backup plugins"
+          description="Pick a backup plugin (Barman Cloud or Klio). One is enough — both can coexist."
+          optional
+          completed={backupPluginInstalled}
         />
       </Box>
     </Box>
