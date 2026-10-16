@@ -126,9 +126,11 @@ jobs:
           # Headlamp 0.46's Plugin Development Mode gate, which fail-closes
           # when window.desktopApi is absent. Without the spoof, plugin fetches
           # go directly to the backend at :4466 (CORS is open with -dev) and
-          # development plugins load. The single-cluster Home auto-redirect is
-          # harmless here: cdp-verify navigates by hash after load, when Home
-          # is already unmounted.
+          # development plugins load. Plain UA also means Headlamp 0.46 renders
+          # a BrowserRouter (HashRouter is Electron-only), so cdp-verify.mjs
+          # navigates by clicking sidebar links instead of setting
+          # window.location.hash. The single-cluster Home auto-redirect just
+          # lands the fresh page in cluster context, where the click walk starts.
           nohup google-chrome --headless=new --disable-gpu --no-sandbox \
             --remote-debugging-port=9222 http://localhost:3000 \
             > chrome.log 2>&1 &

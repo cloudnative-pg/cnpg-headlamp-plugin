@@ -119,11 +119,36 @@ const currentHeading = () =>
     return h ? h.textContent.trim() : null;
   })()`);
 
-// Same settle logic as cdp-verify.mjs: wait for the heading to *change* (hashchange fires
+// Headlamp ≤0.45 (and 0.46 under Electron) routes through a HashRouter, where assigning
+// window.location.hash navigates. Headlamp 0.46+ outside Electron renders a BrowserRouter,
+// which ignores hash changes — there navigation must go through real link clicks, falling
+// back to a full page load for link-less routes (e.g. the /clusters/new create form, which
+// has no sidebar entry to click).
+const routerKind = await evaluate(`(() => {
+  if ((window.location.hash || '').startsWith('#/c/')) return 'hash';
+  if (document.querySelector('a[href^=\"#/c/\"]')) return 'hash';
+  return 'browser';
+})()`);
+console.log(`Router: ${routerKind}`);
+
+// Same settle logic as cdp-verify.mjs: wait for the heading to *change* (navigation is
 // async, so "a heading exists" can pass against stale content) and the spinner to clear.
-const navigateAndSettle = async hash => {
+const navigateAndSettle = async path => {
   const before = await currentHeading();
-  await evaluate(`window.location.hash = ${JSON.stringify(hash)}`);
+  if (routerKind === 'hash') {
+    await evaluate(`window.location.hash = ${JSON.stringify('#' + path)}`);
+  } else {
+    const clicked = await evaluate(`(() => {
+      const a = Array.from(document.querySelectorAll('a[href]'))
+        .find(x => (x.getAttribute('href') || '').endsWith(${JSON.stringify(path)}));
+      if (!a) return false;
+      a.click();
+      return true;
+    })()`);
+    if (!clicked) {
+      await evaluate(`window.location.href = ${JSON.stringify(path)}`);
+    }
+  }
   await waitFor(
     `(() => {
       const h = document.querySelector('${HEADING_SELECTOR}');
@@ -148,33 +173,38 @@ const capture = async file => {
   console.log(`  wrote ${file}`);
 };
 
-// First `#/c/<cluster>/…` link in the DOM — lets `npm run screenshots` work with no args.
+// First `/c/<cluster>/…` link in the DOM — lets `npm run screenshots` work with no args.
+// Matches both HashRouter (`#/c/…`) and BrowserRouter (`/c/…`) hrefs.
 const discoverCluster = () =>
   evaluate(`(() => {
+    const m0 = (window.location.pathname || '').match(/^\\/c\\/([^/]+)/);
+    if (m0) return m0[1];
     const m = (window.location.hash || '').match(/^#\\/c\\/([^/]+)/);
     if (m) return m[1];
     const a = Array.from(document.querySelectorAll('a[href]'))
-      .map(x => x.getAttribute('href') || '').find(h => h.includes('#/c/'));
-    const m2 = a && a.match(/#\\/c\\/([^/]+)/);
+      .map(x => x.getAttribute('href') || '').find(h => h.includes('/c/'));
+    const m2 = a && a.match(/(?:#)?\\/c\\/([^/]+)/);
     return m2 ? m2[1] : null;
   })()`);
 
 const CLUSTER = clusterArg || (await discoverCluster()) || 'kind-headlamp-test';
 console.log(`Cluster: ${CLUSTER}  (${VIEWPORT_W}x${VIEWPORT_H} @${SCALE}x -> ${OUT_DIR}/)`);
 // Land in cluster context first: Headlamp only renders this plugin's routes/sidebar there.
-await navigateAndSettle(`#/c/${CLUSTER}/cnpg/status`);
+await navigateAndSettle(`/c/${CLUSTER}/cnpg/status`);
 
 // Detail links: prefer the demo objects (stable names for stable shots), else first row link.
 // Navigates to the list first — discovery reads the current DOM, so it must run there.
+// Returned hrefs are normalized to plain paths (no leading '#') for navigateAndSettle.
 const detailHrefFromList = async (listPath, preferred, regexSrc) => {
-  await navigateAndSettle(`#${listPath}`);
+  await navigateAndSettle(listPath);
   return evaluate(`(() => {
     const links = Array.from(document.querySelectorAll('a[href]'))
       .map(a => a.getAttribute('href') || '');
     const pref = links.find(h => h.includes(${JSON.stringify(preferred)}));
-    if (pref) return pref;
+    if (pref) return pref.replace(/^#/, '');
     const re = new RegExp(${JSON.stringify(regexSrc)});
-    return links.find(h => re.test(h)) || null;
+    const hit = links.find(h => re.test(h));
+    return hit ? hit.replace(/^#/, '') : null;
   })()`);
 };
 
@@ -182,14 +212,14 @@ const shots = [
   {
     name: 'operator-status',
     run: async () => {
-      await navigateAndSettle(`#/c/${CLUSTER}/cnpg/status`);
+      await navigateAndSettle(`/c/${CLUSTER}/cnpg/status`);
       await capture(`${OUT_DIR}/operator-status.png`);
     },
   },
   {
     name: 'cluster-list',
     run: async () => {
-      await navigateAndSettle(`#/c/${CLUSTER}/cnpg/clusters`);
+      await navigateAndSettle(`/c/${CLUSTER}/cnpg/clusters`);
       await capture(`${OUT_DIR}/cluster-list.png`);
     },
   },
@@ -202,7 +232,7 @@ const shots = [
         '/cnpg/clusters/[^/]+/[^/]+$'
       );
       if (!href) throw new Error('no Cluster found — apply screenshots/cnpg-demo.yaml first?');
-      await navigateAndSettle(href.startsWith('#') ? href : `#${href}`);
+      await navigateAndSettle(href);
       await capture(`${OUT_DIR}/cluster-detail.png`);
     },
   },
@@ -211,7 +241,7 @@ const shots = [
     run: async () => {
       // The create form is a full route page (/cnpg/clusters/new), not an
       // Activity overlay — navigate to it directly (same as every other shot).
-      await navigateAndSettle(`#/c/${CLUSTER}/cnpg/clusters/new`);
+      await navigateAndSettle(`/c/${CLUSTER}/cnpg/clusters/new`);
       const ready = await waitFor(
         `document.body.textContent.includes('New Cluster') && document.body.textContent.includes('YAML Preview')`,
         { timeoutMs: 10000 }
@@ -224,7 +254,7 @@ const shots = [
   {
     name: 'scheduled-backup-list',
     run: async () => {
-      await navigateAndSettle(`#/c/${CLUSTER}/cnpg/scheduledbackups`);
+      await navigateAndSettle(`/c/${CLUSTER}/cnpg/scheduledbackups`);
       await capture(`${OUT_DIR}/scheduled-backup-list.png`);
     },
   },
@@ -238,9 +268,9 @@ const shots = [
       );
       if (!href) {
         console.warn('  warning: no Database found — capturing the list instead');
-        await navigateAndSettle(`#/c/${CLUSTER}/cnpg/databases`);
+        await navigateAndSettle(`/c/${CLUSTER}/cnpg/databases`);
       } else {
-        await navigateAndSettle(href.startsWith('#') ? href : `#${href}`);
+        await navigateAndSettle(href);
       }
       await capture(`${OUT_DIR}/database-detail.png`);
     },

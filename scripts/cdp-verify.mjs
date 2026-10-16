@@ -107,24 +107,65 @@ await send('Page.reload', { ignoreCache: true });
 await sleep(9000);
 
 const routes = [
-  ['Status', `/c/${CLUSTER}/cnpg/status`],
-  ['Clusters list', `/c/${CLUSTER}/cnpg/clusters`],
-  ['Backups list', `/c/${CLUSTER}/cnpg/backups`],
-  ['Databases list', `/c/${CLUSTER}/cnpg/databases`],
-  ['Poolers list', `/c/${CLUSTER}/cnpg/poolers`],
-  ['ScheduledBackups list', `/c/${CLUSTER}/cnpg/scheduledbackups`],
-  ['Publications list', `/c/${CLUSTER}/cnpg/publications`],
-  ['Subscriptions list', `/c/${CLUSTER}/cnpg/subscriptions`],
-  ['DatabaseRoles list', `/c/${CLUSTER}/cnpg/databaseroles`],
-  ['ImageCatalogs list', `/c/${CLUSTER}/cnpg/imagecatalogs`],
-  ['ClusterImageCatalogs list', `/c/${CLUSTER}/cnpg/clusterimagecatalogs`],
-  ['ObjectStores list', `/c/${CLUSTER}/cnpg/objectstores`],
+  // [check label, sidebar label chain from the in-cluster root, path (display only)]
+  ['Status', `/c/${CLUSTER}/cnpg/status`, ['CloudNativePG', 'Operator Status']],
+  ['Clusters list', `/c/${CLUSTER}/cnpg/clusters`, ['CloudNativePG', 'Postgres Clusters', 'Clusters']],
+  ['Backups list', `/c/${CLUSTER}/cnpg/backups`, ['CloudNativePG', 'Backups', 'Backups']],
+  ['Databases list', `/c/${CLUSTER}/cnpg/databases`, ['CloudNativePG', 'Postgres Clusters', 'Databases']],
+  ['Poolers list', `/c/${CLUSTER}/cnpg/poolers`, ['CloudNativePG', 'Poolers']],
+  [
+    'ScheduledBackups list',
+    `/c/${CLUSTER}/cnpg/scheduledbackups`,
+    ['CloudNativePG', 'Backups', 'Scheduled Backups'],
+  ],
+  [
+    'Publications list',
+    `/c/${CLUSTER}/cnpg/publications`,
+    ['CloudNativePG', 'Postgres Clusters', 'Publications'],
+  ],
+  [
+    'Subscriptions list',
+    `/c/${CLUSTER}/cnpg/subscriptions`,
+    ['CloudNativePG', 'Postgres Clusters', 'Subscriptions'],
+  ],
+  [
+    'DatabaseRoles list',
+    `/c/${CLUSTER}/cnpg/databaseroles`,
+    ['CloudNativePG', 'Postgres Clusters', 'Roles'],
+  ],
+  [
+    'ImageCatalogs list',
+    `/c/${CLUSTER}/cnpg/imagecatalogs`,
+    ['CloudNativePG', 'Image Catalogs', 'ImageCatalogs'],
+  ],
+  [
+    'ClusterImageCatalogs list',
+    `/c/${CLUSTER}/cnpg/clusterimagecatalogs`,
+    ['CloudNativePG', 'Image Catalogs', 'ClusterImageCatalogs'],
+  ],
+  [
+    'ObjectStores list',
+    `/c/${CLUSTER}/cnpg/objectstores`,
+    ['CloudNativePG', 'Backups', 'Object Stores'],
+  ],
 ];
 
 // Headlamp only renders this plugin's sidebar tree once inside a cluster context — a reload can
 // land back on the cluster chooser, where the in-cluster sidebar (and thus these entries) isn't in
-// the DOM at all yet. Navigate in before checking, same as the first ROUTES iteration below does.
-await evaluate(`window.location.hash = ${JSON.stringify('#/c/' + CLUSTER + '/cnpg/status')}`);
+// the DOM at all yet. A fresh load settles into a cluster on its own (single-cluster Home
+// auto-redirect), so just wait for the in-cluster sidebar instead of forcing a navigation.
+// (Assigning window.location.hash only navigates under HashRouter — Electron / Headlamp ≤0.45.
+// Headlamp 0.46+ renders a BrowserRouter outside Electron and ignores hash changes entirely,
+// which is why every route read back the same generic Overview page once the UA spoof was gone.)
+const inCluster = await waitFor(
+  `(() => {
+    const ls = Array.from(document.querySelectorAll('nav a[href]')).map(b =>
+      (b.getAttribute('aria-label') || b.innerText || '').replace(/\\n/g, ' ').trim()
+    );
+    return ls.includes('CloudNativePG') || ls.includes('Workloads');
+  })()`,
+  { timeoutMs: 20000 }
+);
 
 // Sidebar entries render via ListItemButton with `component: renderLink` (ListItemLink.js), which
 // swaps the root DOM tag to a react-router Link — i.e. an <a href>, not a <button>. Only the
@@ -143,17 +184,66 @@ const currentHeading = () =>
     return h ? h.textContent.trim() : null;
   })()`);
 
-// Sets the hash and waits for the page to actually settle on the new route, rather than checking
-// once right after the assignment. `hashchange` fires asynchronously, so the previous route's
-// heading can still be in the DOM on the first poll — waiting only for "a heading exists" can pass
-// immediately against stale content. Waiting for the heading text to change (not just re-appear)
-// catches that, and waiting for the loading spinner to clear too means rows/sections are read from
-// fetched data instead of the pre-fetch state. If this navigates to the route already showing
-// (heading unchanged by design), it harmlessly rides out the timeout — correctness isn't affected,
-// since the already-settled state is what gets read either way.
-const navigateAndSettle = async hash => {
+// Dumps every nav's labels plus the current URL — printed when a navigation misses, so a
+// red run shows what the DOM actually looked like instead of forcing guesses.
+const dumpNavState = () =>
+  evaluate(`(() => {
+    const labelOf = ${labelOf};
+    return JSON.stringify({
+      href: window.location.href,
+      navs: Array.from(document.querySelectorAll('nav')).map(n => ({
+        aria: n.getAttribute('aria-label'),
+        labels: Array.from(n.querySelectorAll('a[href], button'))
+          .map(b => labelOf(b)).filter(Boolean).slice(0, 40),
+      })),
+    }, null, 1);
+  })()`);
+// Clicks through a chain of sidebar labels and waits for the page to actually settle on the new
+// route, rather than checking once right after the last click. Route rendering is async, so the
+// previous route's heading can still be in the DOM on the first poll — waiting only for "a heading
+// exists" can pass immediately against stale content. Waiting for the heading text to change (not
+// just re-appear) catches that, and waiting for the loading spinner to clear too means
+// rows/sections are read from fetched data instead of the pre-fetch state. If this navigates to
+// the route already showing (heading unchanged by design), it harmlessly rides out the timeout —
+// correctness isn't affected, since the already-settled state is what gets read either way.
+// Clicking (rather than assigning window.location.hash) is what makes this work under both
+// HashRouter and BrowserRouter — and it doubles as the expansion mechanism, since Headlamp only
+// mounts a group's children once its entry is selected (Collapse unmountOnExit).
+// Returns false when a label in the chain isn't in the DOM (caller records the miss).
+// On a miss the result carries which step failed plus a DOM snapshot taken at that moment.
+const navigateAndSettle = async chain => {
+  const miss = async at => ({ ok: false, at, navs: await dumpNavState() });
   const before = await currentHeading();
-  await evaluate(`window.location.hash = ${JSON.stringify(hash)}`);
+  // Match sidebar anchors AND navigation-tab buttons. On narrow viewports (Headlamp renders
+  // NavigationTabs instead of the submenu once the viewport hits the sm breakpoint — CI's
+  // headless Chrome defaults to 800px wide) the selected subtree renders as MUI tab buttons
+  // navigating via history.push, not as router links. Exact-label matching keeps this precise.
+  const navItemSelector = 'nav a[href], nav button';
+  const clickLabel = label =>
+    evaluate(`(() => {
+      const labelOf = ${labelOf};
+      const el = Array.from(document.querySelectorAll('${navItemSelector}'))
+        .find(b => labelOf(b) === ${JSON.stringify(label)});
+      if (!el) return false;
+      el.click();
+      return true;
+    })()`);
+  const labelVisible = label =>
+    waitFor(
+      `(() => {
+        const labelOf = ${labelOf};
+        return Array.from(document.querySelectorAll('${navItemSelector}'))
+          .some(b => labelOf(b) === ${JSON.stringify(label)});
+      })()`,
+      { timeoutMs: 8000 }
+    );
+  for (let i = 0; i < chain.length; i++) {
+    if (!(await clickLabel(chain[i]))) return miss(`click:${chain[i]}`);
+    // Selecting a parent mounts its children asynchronously (Collapse unmountOnExit via a
+    // Redux round-trip) — wait for the next level to appear instead of sleeping a fixed delay.
+    if (i < chain.length - 1 && !(await labelVisible(chain[i + 1])))
+      return miss(`expand:${chain[i + 1]} (after click:${chain[i]})`);
+  }
   await waitFor(
     `(() => {
       const h = document.querySelector('${HEADING_SELECTOR}');
@@ -163,25 +253,41 @@ const navigateAndSettle = async hash => {
     })()`,
     { timeoutMs: 10000 }
   );
+  return { ok: true };
 };
 
 // Collected up front so the sidebar check below can fail the run the same way an empty route does,
 // instead of only logging and letting the script exit 0.
 const emptyRoutes = [];
 
-// The top-level 'CloudNativePG' entry is always in the DOM, but its children (including 'Postgres
-// Clusters') only mount once Redux has processed the route's sidebar selection and marked it
-// expanded (Headlamp's sidebar Collapse uses unmountOnExit) — that lags the URL change, so poll for
-// the actual target label rather than guessing a fixed delay.
-const sidebarReady = await waitFor(`(() => {
+// The top-level 'CloudNativePG' entry is always in the DOM in cluster context, but its children
+// (including 'Postgres Clusters') only mount once the entry is selected and marked expanded
+// (Headlamp's sidebar Collapse uses unmountOnExit) — so click it to expand, then poll for the
+// actual target label rather than guessing a fixed delay.
+if (inCluster) {
+  await navigateAndSettle(['CloudNativePG']);
+}
+const sidebarReady =
+  inCluster &&
+  (await waitFor(`(() => {
   const labelOf = ${labelOf};
   return Array.from(document.querySelectorAll('nav')).some(n =>
     Array.from(n.querySelectorAll(${itemSelector})).some(b => labelOf(b) === 'Postgres Clusters')
   );
-})()`);
+})()`));
 if (!sidebarReady) {
   console.error('Timed out waiting for the "Postgres Clusters" sidebar entry to appear.');
   emptyRoutes.push('Sidebar (Postgres Clusters entry)');
+}
+if (!inCluster) {
+  // The plugin tree only exists inside a cluster context. If Headlamp can't talk to the
+  // cluster at all (stale kubeconfig, stopped kind containers, …) the app stays on the
+  // global nav and every check below fails the same way — say so directly. Typical symptom
+  // in CONSOLE is "Failed to fetch CRDs: r: Unreachable".
+  console.error(
+    'Hint: never entered cluster context — is the cluster reachable? ' +
+      'Check `kubectl get nodes` (kind clusters die with their docker containers).'
+  );
 }
 
 console.log('=== SIDEBAR ===');
@@ -213,8 +319,15 @@ const sidebar = await evaluate(`(() => {
 console.log(sidebar);
 
 console.log('\n=== ROUTES ===');
-for (const [label, path] of routes) {
-  await navigateAndSettle('#' + path);
+for (const [label, path, chain] of routes) {
+  const navigated = await navigateAndSettle(chain);
+  if (!navigated.ok) {
+    console.log(`\n-- ${label}  [${path}]`);
+    console.log(`   miss at ${navigated.at}`);
+    console.log(`   nav state at miss: ${navigated.navs}`);
+    emptyRoutes.push(`${label} (sidebar nav)`);
+    continue;
+  }
   const info = await evaluate(`(() => {
     const hasSpinner = !!document.querySelector('[role="progressbar"]');
     const h = document.querySelector('${HEADING_SELECTOR}');
@@ -246,16 +359,34 @@ for (const [label, path] of routes) {
 // A Cluster detail page exercises the most code (sections, related-resource lookups), so visit a
 // real one rather than a fixed name — whichever the list happens to hold.
 console.log('\n=== CLUSTER DETAIL (first cluster in the list) ===');
-await navigateAndSettle(`#/c/${CLUSTER}/cnpg/clusters`);
+await navigateAndSettle(['CloudNativePG', 'Postgres Clusters', 'Clusters']);
 const detailHref = await evaluate(`(() => {
   const a = Array.from(document.querySelectorAll('a[href]'))
     .find(x => /\\/cnpg\\/clusters\\/[^/]+\\/[^/]+$/.test(x.getAttribute('href') || ''));
   return a ? a.getAttribute('href') : null;
 })()`);
-if (!detailHref) {
+const detailClicked =
+  !!detailHref &&
+  (await evaluate(`(() => {
+    const a = Array.from(document.querySelectorAll('a[href]'))
+      .find(x => /\\/cnpg\\/clusters\\/[^/]+\\/[^/]+$/.test(x.getAttribute('href') || ''));
+    if (!a) return false;
+    a.click();
+    return true;
+  })()`));
+if (!detailClicked) {
   console.log('   (no clusters in this namespace — detail page not exercised)');
 } else {
-  await navigateAndSettle(detailHref);
+  const beforeDetail = await currentHeading();
+  await waitFor(
+    `(() => {
+      const h = document.querySelector('${HEADING_SELECTOR}');
+      const text = h ? h.textContent.trim() : null;
+      const noSpinner = !document.querySelector('[role="progressbar"]');
+      return text !== ${JSON.stringify(beforeDetail)} && noSpinner;
+    })()`,
+    { timeoutMs: 10000 }
+  );
   console.log(
     '   ' +
       (await evaluate(`(() => {
