@@ -222,10 +222,29 @@ const navigateAndSettle = async chain => {
   const clickLabel = label =>
     evaluate(`(() => {
       const labelOf = ${labelOf};
-      const el = Array.from(document.querySelectorAll('${navItemSelector}'))
-        .find(b => labelOf(b) === ${JSON.stringify(label)});
-      if (!el) return false;
-      el.click();
+      const q = '${navItemSelector}';
+      const matches = el => labelOf(el) === ${JSON.stringify(label)};
+      // Once expanded, the plugin's subtree lives in its own nav (the 'Main Navigation' tabs
+      // on narrow viewports, inline in the main nav on wide ones). Prefer it: bare labels like
+      // 'Clusters' also exist on Headlamp's built-in entries, and a global first-match can walk
+      // into the wrong page (same label, different destination).
+      const navs = Array.from(document.querySelectorAll('nav'));
+      const pluginNav = navs.find(n =>
+        Array.from(n.querySelectorAll(q)).some(b => labelOf(b) === 'Postgres Clusters')
+      );
+      const scope = pluginNav ? [pluginNav] : navs;
+      for (const n of scope) {
+        const hit = Array.from(n.querySelectorAll(q)).find(matches);
+        if (hit) {
+          hit.click();
+          return true;
+        }
+      }
+      // Fallback for entries outside the plugin subtree (e.g. the 'CloudNativePG' root itself,
+      // which lives in the main nav).
+      const fallback = Array.from(document.querySelectorAll(q)).find(matches);
+      if (!fallback) return false;
+      fallback.click();
       return true;
     })()`);
   const labelVisible = label =>
