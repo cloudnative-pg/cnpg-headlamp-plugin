@@ -13,10 +13,11 @@
  *        Electron: npm run start:with-app:debug   # :9222 (in the Headlamp checkout)
  *        --or-- plain Chrome/Chromium headless against the frontend:
  *        google-chrome --headless=new --no-sandbox \
- *          --user-agent="Mozilla/5.0 Electron/32.0.0 Chrome Safari" \
  *          --remote-debugging-port=9222 http://localhost:3000
- *      (the UA spoof sidesteps Headlamp's single-cluster Home redirect that would
- *      otherwise stomp hash navigations — same trick as the CI smoke test.)
+ *      (Do NOT spoof an Electron UA on Headlamp 0.46+: it flips getAppUrl()
+ *      to same-origin and trips the Plugin Development Mode gate, so dev-dir
+ *      plugins silently stop loading. Plain Chrome fetches plugins directly
+ *      from the backend :4466 instead.)
  *   3. ./screenshots/seed-demo.sh --wait          # once per cluster
  *   4. node scripts/cdp-screenshots.mjs [headlamp-cluster-name] [--out=img] [--only=a,b,c]
  *

@@ -120,14 +120,16 @@ jobs:
 
       - name: Start headless Chrome against the frontend (CDP :9222)
         run: |
-          # frontend/src/helpers/isElectron.ts detects Electron partly via a user-agent substring
-          # check. Headlamp's Home page (frontend/src/components/App/Home/index.tsx) auto-redirects
-          # to the single configured cluster's generic Overview page whenever !isElectron() and
-          # there's exactly one cluster — exactly this setup — which stomps every hash navigation
-          # this check does before it ever reaches the plugin's own routes. Spoofing the UA sidesteps
-          # that Headlamp-side special case without needing real Electron.
+          # Plain Chrome UA on purpose: spoofing Electron (e.g. via --user-agent)
+          # makes isElectron() true, which flips getAppUrl() to same-origin '/'
+          # (pushing plugin fetches through the :3000 dev proxy) and trips
+          # Headlamp 0.46's Plugin Development Mode gate, which fail-closes
+          # when window.desktopApi is absent. Without the spoof, plugin fetches
+          # go directly to the backend at :4466 (CORS is open with -dev) and
+          # development plugins load. The single-cluster Home auto-redirect is
+          # harmless here: cdp-verify navigates by hash after load, when Home
+          # is already unmounted.
           nohup google-chrome --headless=new --disable-gpu --no-sandbox \
-            --user-agent="Mozilla/5.0 Electron/32.0.0 Chrome Safari" \
             --remote-debugging-port=9222 http://localhost:3000 \
             > chrome.log 2>&1 &
           disown
