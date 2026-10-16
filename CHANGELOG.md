@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.5](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/compare/v0.1.4...v0.1.5) (2026-10-16)
+
+
+### Features
+
+* **clusters:** add fence and unfence actions for instances ([#103](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/issues/103)) ([f6d91a4](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/commit/f6d91a442b8e9dd7df44f38cdf3701019c85de35))
+* **clusters:** add hibernation and rehydration support ([#80](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/issues/80)) ([aa39a63](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/commit/aa39a6345752923bb53d9988dc3432e62969eccd))
+* **objectstores:** add Recover action to the recovery window ([#107](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/issues/107)) ([ad89ea1](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/commit/ad89ea114ce67225d6490a705ea555ca1b81842b)), refs [#99](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/issues/99)
+* **status:** add install guide to the status page ([#102](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/issues/102)) ([120df2a](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/commit/120df2a01193243859fa7956c325a301edade1da)), refs [#92](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/issues/92)
+
 ## [0.1.4](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/compare/v0.1.3...v0.1.4) (2026-09-28)
 
 
