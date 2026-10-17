@@ -27,19 +27,47 @@ export interface ParsedLogLine {
 const KNOWN_TOP_LEVEL_KEYS = new Set(['level', 'ts', 'msg', 'logger', 'record', 'logging_pod']);
 const KNOWN_RECORD_KEYS = new Set(['message', 'error_severity']);
 
+/** Upper bound on how many following fragments we try gluing onto an unterminated JSON line. */
+const MAX_JOINED_FRAGMENTS = 16;
+
+function isJson(text: string): boolean {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * pod.getLogs delivers log lines in whatever chunks the underlying stream happens to arrive in —
  * not necessarily one array entry per newline-terminated log line. A single entry can bundle
- * several real lines (JSON or not) joined by embedded "\n"s. JSON.parse on such a bundle fails
- * (trailing data after the first object), so parseCnpgLogLine falls back to treating the whole
- * bundle as one opaque, uncolored line. Re-split on "\n" first so each real line is parsed (and
- * colored) individually.
+ * several real lines (JSON or not) joined by embedded "\n"s, and, conversely, one real line can
+ * be cut in two by a chunk boundary (the first half ends one entry, the rest starts the next).
+ * So we re-split on "\n" first, then glue back any fragment that starts like a JSON object but
+ * doesn't parse onto the fragments that follow it (a JSON string can't hold a raw newline, so the
+ * pieces concatenate directly) until the result parses. Fragments that never complete — e.g. the
+ * still-streaming tail — are kept as they are and get fixed on a later update.
  */
 export function parseCnpgLogLines(rawLines: string[]): ParsedLogLine[] {
-  return rawLines
-    .flatMap(line => line.split('\n'))
-    .filter(line => line.length > 0)
-    .map(parseCnpgLogLine);
+  const fragments = rawLines.flatMap(line => line.split('\n')).filter(line => line.length > 0);
+  const result: ParsedLogLine[] = [];
+  for (let i = 0; i < fragments.length; i++) {
+    let line = fragments[i];
+    if (line.startsWith('{') && !isJson(line)) {
+      let joined = line;
+      for (let j = i + 1; j < fragments.length && j <= i + MAX_JOINED_FRAGMENTS; j++) {
+        joined += fragments[j];
+        if (isJson(joined)) {
+          line = joined;
+          i = j;
+          break;
+        }
+      }
+    }
+    result.push(parseCnpgLogLine(line));
+  }
+  return result;
 }
 
 export function parseCnpgLogLine(raw: string): ParsedLogLine {
