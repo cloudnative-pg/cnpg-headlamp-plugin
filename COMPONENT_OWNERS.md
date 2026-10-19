@@ -18,6 +18,8 @@ them for review.
 
 | Name | GitHub Handle | Country |
 | :--- | :--- | :--- |
+| Leonardo Cecchi | [@leonardoce](https://github.com/leonardoce) | Italy |
+| Thomas Gamble | [@gambtho](https://github.com/gambtho) | USA |
 | Tamara Nocentini | [@TamaraNocentini](https://github.com/TamaraNocentini) | Italy |
 
 Component Owner is a rung of the CloudNativePG contributor ladder. A new
