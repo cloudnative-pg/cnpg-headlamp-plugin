@@ -1,9 +1,13 @@
+import { Icon } from '@iconify/react';
 import { ApiProxy } from '@kinvolk/headlamp-plugin/lib';
 import {
   ActionButton,
   AuthVisible,
   ConfirmDialog,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import MenuItem from '@mui/material/MenuItem';
 import Tooltip from '@mui/material/Tooltip';
 import { useSnackbar } from 'notistack';
 import { useState } from 'react';
@@ -28,7 +32,24 @@ async function setTargetPrimary(cluster: Cluster, targetPrimary: string) {
   );
 }
 
-export function SwitchoverAction({ cluster, pod }: { cluster: Cluster; pod: Pod }) {
+export function SwitchoverAction({
+  cluster,
+  pod,
+  buttonStyle = 'action',
+  afterConfirm,
+}: {
+  cluster: Cluster;
+  pod: Pod;
+  /** 'menu' when rendered inside a row-action menu, 'action' (icon) elsewhere. */
+  buttonStyle?: 'action' | 'menu';
+  /**
+   * Closes the row-action menu after the dialog is confirmed (menu usage only). This must NOT
+   * run when opening the dialog: the toggle lives inside the menu, so closing it first would
+   * unmount this component and instantly kill the dialog's `open` state. DeleteButton follows
+   * this same open-first-close-after pattern via its own `afterConfirm`.
+   */
+  afterConfirm?: () => void;
+}) {
   const { enqueueSnackbar } = useSnackbar();
   const [open, setOpen] = useState(false);
   // ActionButton doesn't accept a bare `disabled` prop (only `iconButtonProps.disabled`), so
@@ -36,15 +57,41 @@ export function SwitchoverAction({ cluster, pod }: { cluster: Cluster; pod: Pod 
   // is wired in directly instead, following the same allowed-until-checked default.
   const [allowed, setAllowed] = useState(true);
   const replicaName = pod.getName();
+  const description = 'Switchover to this instance';
+  const icon = 'mdi:crown-outline';
+  const deniedMessage = "You don't have permission to switch over this cluster's primary.";
 
-  const button = (
-    <ActionButton
-      description="Switchover to this instance"
-      icon="mdi:crown-outline"
-      onClick={() => setOpen(true)}
-      iconButtonProps={{ disabled: !allowed }}
-    />
-  );
+  const button =
+    buttonStyle === 'menu' ? (
+      // Menu-style ActionButtons ignore `disabled`, so the denied state renders its own
+      // disabled MenuItem instead of being hidden — a read-only user still sees the action.
+      allowed ? (
+        <ActionButton
+          description={description}
+          icon={icon}
+          buttonStyle="menu"
+          onClick={() => setOpen(true)}
+        />
+      ) : (
+        <Tooltip title={deniedMessage}>
+          <span>
+            <MenuItem disabled>
+              <ListItemIcon>
+                <Icon icon={icon} width={20} />
+              </ListItemIcon>
+              <ListItemText>{description}</ListItemText>
+            </MenuItem>
+          </span>
+        </Tooltip>
+      )
+    ) : (
+      <ActionButton
+        description={description}
+        icon={icon}
+        onClick={() => setOpen(true)}
+        iconButtonProps={{ disabled: !allowed }}
+      />
+    );
 
   return (
     <>
@@ -56,12 +103,12 @@ export function SwitchoverAction({ cluster, pod }: { cluster: Cluster; pod: Pod 
       >
         {null}
       </AuthVisible>
-      {allowed ? (
-        button
-      ) : (
+      {buttonStyle === 'action' && !allowed ? (
         <Tooltip title="You don't have permission to switch over this cluster's primary.">
           <span>{button}</span>
         </Tooltip>
+      ) : (
+        button
       )}
       <ConfirmDialog
         open={open}
@@ -80,6 +127,7 @@ export function SwitchoverAction({ cluster, pod }: { cluster: Cluster; pod: Pod 
         }
         onConfirm={() => {
           setOpen(false);
+          afterConfirm?.();
           setTargetPrimary(cluster, replicaName)
             .then(() => {
               enqueueSnackbar(`Switchover to ${replicaName} started`, { variant: 'success' });

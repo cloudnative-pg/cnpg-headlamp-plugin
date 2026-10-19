@@ -1,10 +1,17 @@
 import { Router } from '@kinvolk/headlamp-plugin/lib';
-import { ResourceListView } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import {
+  ColumnType,
+  Link,
+  ResourceListView,
+  ResourceTableColumn,
+} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Button from '@mui/material/Button';
+import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Subscription } from '../../resources/subscription';
 import { AppliedStatusLabel } from '../common/AppliedStatusLabel';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
+import { ListPageHeader, SummaryStat } from '../common/ListHeader';
 import { launchSubscriptionCreate } from './Create';
 
 const { createRouteURL } = Router;
@@ -13,9 +20,25 @@ export function SubscriptionAppliedLabel({ subscription }: { subscription: Subsc
   return <AppliedStatusLabel applied={subscription.applied} message={subscription.message} />;
 }
 
-function subscriptionColumns(): any[] {
+function subscriptionStats(items: Subscription[]): SummaryStat[] {
+  const total = items.length;
+  const applied = items.filter(item => item.applied === true).length;
+  const needsAttention = items.filter(item => item.applied === false).length;
   return [
-    'name',
+    { value: total, label: total === 1 ? 'Subscription' : 'Subscriptions' },
+    { value: applied, label: 'Applied' },
+    { value: needsAttention, label: 'Needs attention', highlight: needsAttention > 0 },
+  ];
+}
+
+function subscriptionColumns(): (ResourceTableColumn<Subscription> | ColumnType)[] {
+  return [
+    {
+      id: 'name',
+      label: 'Name',
+      getValue: (item: Subscription) => item.getName(),
+      render: (item: Subscription) => <Link kubeObject={item} />,
+    },
     'namespace',
     {
       id: 'cluster',
@@ -52,6 +75,32 @@ function subscriptionColumns(): any[] {
   ];
 }
 
+function subscriptionActions(): ReactNode[] {
+  return [
+    <AuthDisabledButton
+      key="create-subscription"
+      item={Subscription}
+      authVerb="create"
+      deniedMessage="You don't have permission to create Subscriptions."
+    >
+      <Button variant="contained" color="primary" onClick={() => launchSubscriptionCreate()}>
+        Create Subscription
+      </Button>
+    </AuthDisabledButton>,
+  ];
+}
+
+function SubscriptionListTitleDefault() {
+  const [subscriptions] = Subscription.useList();
+  return (
+    <ListPageHeader
+      title="Subscriptions"
+      actions={subscriptionActions()}
+      stats={subscriptionStats(subscriptions ?? [])}
+    />
+  );
+}
+
 export function SubscriptionsList() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -68,35 +117,22 @@ export function SubscriptionsList() {
     ? (allSubscriptions ?? []).filter(item => item.clusterName === clusterFilter)
     : null;
 
-  const headerProps = {
-    // ResourceListView auto-injects Headlamp's own generic CreateResourceButton next to the
-    // title whenever resourceClass is set and titleSideActions isn't — suppress it here since
-    // our guided create form below already covers that slot via actions.
-    titleSideActions: [],
-    actions: [
-      <AuthDisabledButton
-        key="create-subscription"
-        item={Subscription}
-        authVerb="create"
-        deniedMessage="You don't have permission to create Subscriptions."
-      >
-        <Button variant="contained" color="primary" onClick={() => launchSubscriptionCreate()}>
-          Create Subscription
-        </Button>
-      </AuthDisabledButton>,
-    ],
-  };
-
   if (clusterFilter) {
     return (
       <ResourceListView
-        title={`Subscriptions for ${clusterFilter}`}
+        title={
+          <ListPageHeader
+            title={`Subscriptions for ${clusterFilter}`}
+            actions={subscriptionActions()}
+            stats={subscriptionStats(filteredSubscriptions ?? [])}
+          />
+        }
         backLink={createRouteURL('CNPG Cluster', {
           namespace: namespaceFilter,
           name: clusterFilter,
         })}
         data={filteredSubscriptions}
-        headerProps={headerProps}
+        id="cnpg-subscriptions"
         columns={subscriptionColumns()}
       />
     );
@@ -104,9 +140,9 @@ export function SubscriptionsList() {
 
   return (
     <ResourceListView
-      title="Subscriptions"
+      title={<SubscriptionListTitleDefault />}
       resourceClass={Subscription}
-      headerProps={headerProps}
+      id="cnpg-subscriptions"
       columns={subscriptionColumns()}
     />
   );

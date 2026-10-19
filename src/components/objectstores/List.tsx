@@ -1,9 +1,41 @@
-import { ResourceListView } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import { Link, ResourceListView } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Button from '@mui/material/Button';
 import { ObjectStore } from '../../resources/objectStore';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
 import { BarmanCloudNotInstalled, useBarmanCloudCrdInstalled } from '../common/barmanCloud';
+import { ListPageHeader, SummaryStat } from '../common/ListHeader';
 import { launchObjectStoreCreate } from './Create';
+
+function objectStoreStats(stores: ObjectStore[]): SummaryStat[] {
+  const total = stores.length;
+  const namespaces = new Set(stores.map(s => s.getNamespace())).size;
+  return [
+    { value: total, label: total === 1 ? 'ObjectStore' : 'ObjectStores' },
+    { value: namespaces, label: namespaces === 1 ? 'Namespace' : 'Namespaces' },
+  ];
+}
+
+function ObjectStoreListTitle() {
+  const [stores] = ObjectStore.useList();
+  return (
+    <ListPageHeader
+      title="ObjectStores"
+      actions={[
+        <AuthDisabledButton
+          key="create-objectstore"
+          item={ObjectStore}
+          authVerb="create"
+          deniedMessage="You don't have permission to create ObjectStores."
+        >
+          <Button variant="contained" color="primary" onClick={() => launchObjectStoreCreate()}>
+            Create ObjectStore
+          </Button>
+        </AuthDisabledButton>,
+      ]}
+      stats={objectStoreStats(stores ?? [])}
+    />
+  );
+}
 
 export function ObjectStoresList() {
   const barmanCloudInstalled = useBarmanCloudCrdInstalled();
@@ -16,28 +48,16 @@ export function ObjectStoresList() {
 
   return (
     <ResourceListView
-      title="ObjectStores"
+      title={<ObjectStoreListTitle />}
       resourceClass={ObjectStore}
-      headerProps={{
-        // ResourceListView auto-injects Headlamp's own generic CreateResourceButton next to the
-        // title whenever resourceClass is set and titleSideActions isn't — suppress it here
-        // since our guided create form below already covers that slot via actions.
-        titleSideActions: [],
-        actions: [
-          <AuthDisabledButton
-            key="create-objectstore"
-            item={ObjectStore}
-            authVerb="create"
-            deniedMessage="You don't have permission to create ObjectStores."
-          >
-            <Button variant="contained" color="primary" onClick={() => launchObjectStoreCreate()}>
-              Create ObjectStore
-            </Button>
-          </AuthDisabledButton>,
-        ],
-      }}
+      id="cnpg-object-stores"
       columns={[
-        'name',
+        {
+          id: 'name',
+          label: 'Name',
+          getValue: item => item.getName(),
+          render: item => <Link kubeObject={item} />,
+        },
         'namespace',
         {
           id: 'destinationPath',

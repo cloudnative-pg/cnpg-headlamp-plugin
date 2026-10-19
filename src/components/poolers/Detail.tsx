@@ -1,6 +1,5 @@
 import { K8s } from '@kinvolk/headlamp-plugin/lib';
 import {
-  ActionButton,
   DetailsGrid,
   ResourceLink,
   SectionBox,
@@ -8,7 +7,8 @@ import {
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { useParams } from 'react-router-dom';
 import { Pooler } from '../../resources/pooler';
-import { launchLogs, Pod, PodPhaseLabel } from '../common/podActions';
+import { Pod, PodPhaseLabel } from '../common/podActions';
+import { ViewLogsButton } from '../common/podLogs';
 import { PoolerStatusLabel } from './List';
 
 function PoolerPodsSection({ pooler }: { pooler: Pooler }) {
@@ -35,13 +35,7 @@ function PoolerPodsSection({ pooler }: { pooler: Pooler }) {
           },
           {
             label: 'Actions',
-            getter: (pod: Pod) => (
-              <ActionButton
-                description="View logs"
-                icon="mdi:file-document-box-outline"
-                onClick={() => launchLogs(pod)}
-              />
-            ),
+            getter: (pod: Pod) => <ViewLogsButton pod={pod} />,
           },
         ]}
         data={pods ?? []}

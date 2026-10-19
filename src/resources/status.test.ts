@@ -1,5 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { appliedSeverity, backupPhaseSeverity } from './status';
+import {
+  appliedSeverity,
+  backupPhaseSeverity,
+  getImageVersion,
+  humanizePluginName,
+  KNOWN_PLUGIN_CAPABILITIES,
+  parseBool,
+} from './status';
+
+describe('parseBool', () => {
+  // Mirrors Go's strconv.ParseBool exactly — every accepted spelling must round-trip, since
+  // CNPG writes e.g. "True" into status conditions and this is what parses them back out.
+  it.each(['1', 't', 'T', 'TRUE', 'true', 'True'])('parses %s as true', value => {
+    expect(parseBool(value)).toBe(true);
+  });
+
+  it.each(['0', 'f', 'F', 'FALSE', 'false', 'False'])('parses %s as false', value => {
+    expect(parseBool(value)).toBe(false);
+  });
+
+  // CNPG's hibernation annotation uses `on`/`off`, which strconv.ParseBool rejects — passing
+  // those here must not read as either boolean, otherwise the annotation and the status
+  // condition (`"True"`/`"False"`) would be conflated.
+  it.each([undefined, '', 'on', 'off', 'ON', 'OFF', 'yes', 'no', '2', ' true'])(
+    'returns undefined for %s',
+    value => {
+      expect(parseBool(value)).toBeUndefined();
+    }
+  );
+});
 
 describe('backupPhaseSeverity', () => {
   it('marks a completed backup as success', () => {
@@ -37,5 +66,54 @@ describe('appliedSeverity', () => {
   // must not be conflated with `false`, which means the operator tried and failed.
   it('treats an unreconciled object as neutral, not failed', () => {
     expect(appliedSeverity(undefined)).toBe('');
+  });
+});
+
+describe('getImageVersion', () => {
+  it('extracts the tag from a fully-qualified image, normalizing to a single leading v', () => {
+    expect(getImageVersion('ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0')).toBe('v1.30.0');
+    expect(getImageVersion('ghcr.io/cloudnative-pg/cloudnative-pg:1.30.1-ubi9-catalog')).toBe(
+      'v1.30.1-ubi9-catalog'
+    );
+    expect(getImageVersion('ghcr.io/cloudnative-pg/plugin-barman-cloud:v0.15.0')).toBe('v0.15.0');
+  });
+
+  it('falls back to a placeholder for a missing image', () => {
+    expect(getImageVersion(undefined)).toBe('-');
+  });
+
+  it('reports devel for non-version tags, including registries with a port', () => {
+    expect(getImageVersion('registry.dev:5000/cnpg-i-spiffe:latest')).toBe('devel');
+    expect(getImageVersion('ghcr.io/cloudnative-pg/cloudnative-pg:main')).toBe('devel');
+  });
+
+  it('reports devel when there is no tag', () => {
+    expect(getImageVersion('postgres')).toBe('devel');
+  });
+
+  it('ignores digests when extracting the tag', () => {
+    expect(getImageVersion('ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0@sha256:abc123')).toBe(
+      'v1.30.0'
+    );
+    expect(getImageVersion('registry.dev:5000/cnpg-i-spiffe:latest@sha256:abc123')).toBe('devel');
+  });
+});
+
+describe('humanizePluginName', () => {
+  it('uses the display name of well-known plugins', () => {
+    expect(humanizePluginName('barman-cloud.cloudnative-pg.io')).toBe('Barman Cloud');
+  });
+
+  it('prettifies unknown plugin IDs from the part before the first dot', () => {
+    expect(humanizePluginName('my-plugin.example.io')).toBe('My Plugin');
+  });
+
+  it('documents capabilities only for plugins whose behavior is known', () => {
+    expect(KNOWN_PLUGIN_CAPABILITIES['barman-cloud.cloudnative-pg.io']).toEqual([
+      'Backup',
+      'WAL archiving',
+      'Restore',
+    ]);
+    expect(KNOWN_PLUGIN_CAPABILITIES['my-plugin.example.io']).toBeUndefined();
   });
 });

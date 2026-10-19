@@ -1,12 +1,30 @@
-[![CloudNativePG](./logo/cloudnativepg.png)](https://cloudnative-pg.io/)
+[![CloudNativePG](https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/logo/cloudnativepg.svg)](https://cloudnative-pg.io/)
 
 # CNPG Headlamp Plugin
 
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/cnpg-headlamp-plugin)](https://artifacthub.io/packages/search?repo=cnpg-headlamp-plugin)
+
 A [Headlamp](https://headlamp.dev/) plugin for managing and visualizing [CloudNativePG](https://cloudnative-pg.io/) (CNPG) resources — Clusters, Poolers, Backups, Scheduled Backups, and Database objects — directly from the Headlamp UI.
+
+
+<table>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/operator-status.png" alt="Operator status page" width="400"></td>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/cluster-list.png" alt="Cluster list" width="400"></td>
+  </tr>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/cluster-detail.png" alt="Cluster detail" width="400"></td>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/cluster-form.png" alt="Cluster creation form" width="400"></td>
+  </tr>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/scheduled-backup-list.png" alt="Scheduled backups list" width="400"></td>
+    <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/database-detail.png" alt="Database detail" width="400"></td>
+  </tr>
+ </table>
 
 ## Features
 
-#### Clusters
+### Clusters
 
 List and detail views, plus a guided creation form.
 
@@ -14,96 +32,82 @@ List and detail views, plus a guided creation form.
 - Instance roles and synchronous replication warnings
 - Per-instance Postgres logs (filterable, color-coded, live-following)
 - A `psql` terminal against the primary or any replica
+- A **Live Metrics** section on the cluster's detail page, scraped from each instance's CNPG Prometheus exporter (port 9187) via the Kubernetes API's pod proxy subresource — no `psql` or exec involved. It is organized into collapsible categories:
+  - **Replication & Archiving** (primary only): connected standbys, replication lag, inactive slots, WAL archiving failures, backlog and timing, sync replica counts, plus per-standby and per-slot detail tables
+  - **General Health** and **Checkpointing** (switchable per instance via a dropdown): connections, cache hit ratio, database size, blocked and long running queries, deadlocks, checkpoint and restartpoint counts
+  - **Database Health**: transaction ID and multixact age, rollback ratio, temp file spill, and extension updates, per database
+  - A status strip flags fencing, a pending manual switchover, or available extension updates when applicable. Tiles show an (i) icon with a short description and the underlying `cnpg_*` metric name(s), with an optional automatic refresh interval (15s/30s/60s or off, matched to the exporter's own 30 second refresh cadence)
 - A manual **switchover** action to promote a chosen replica to primary
+- **Fencing** support (mirroring `kubectl cnpg fencing on|off`): fence or unfence individual instances from the cluster's instance list, with an extra warning when fencing the primary
+- **Hibernation** support (mirroring `kubectl cnpg hibernate on|off`): hibernate a running cluster from its detail page or the cluster list to delete its instance pods while retaining storage, see hibernated clusters clearly marked (with their own summary count) in the list, and rehydrate them from the list
 - Leader-election **lease** details (holder, acquire/renew time, duration, transitions) alongside the cluster's main info
-- Creation form (with live YAML preview) covering instances/HA, storage and tablespaces, backup configuration, volume snapshots, and bootstrap — including bootstrapping a new cluster from an existing backup
+- Tabbed creation page (General, PostgreSQL, High Availability, Storage, Backup, YAML preview) with a configuration summary rail, on-demand dry-run validation, custom CNPG-I backup/recovery plugins, and GUC presets — including bootstrapping a new cluster from an existing backup
 
-#### Poolers (PgBouncer)
+### Poolers (PgBouncer)
 
 List/detail views and a guided creation form.
 
-#### Backups
+### Backups
 
 On-demand backups with status tracking, created against the Barman Cloud plugin or via volume snapshots (not the deprecated in-tree `barmanObjectStore`).
 
-#### Scheduled Backups
+### Scheduled Backups
 
 - Graphical cron editor (Daily/Weekly/Monthly, plus a raw-text advanced mode) with a humanized schedule description
 - A "trigger now" action
 
-#### Object Stores
+### Object Stores
 
-Manage the `ObjectStore` CRs backing the Barman Cloud plugin, with a "referring clusters" section showing which clusters use each store for backup and/or recovery.
+Manage the `ObjectStore` CRs backing the Barman Cloud plugin, with a "referring clusters" section showing which clusters use each store for backup and/or recovery, and a per-server "Recover" action in the recovery window table that opens the creation page pre-filled to restore that server's backups into a new cluster.
 
-#### Database objects
+### Database objects
 
 List/detail/create views for `Database`, `DatabaseRole`, `Publication`, and `Subscription`, each showing reconciliation status.
 
-#### Image Catalogs / Cluster Image Catalogs
+### Image Catalogs / Cluster Image Catalogs
 
 List and detail views for managing available Postgres operand images.
 
-#### Operator status page
+### Operator status page
 
 - Installed CNPG CRDs and operator pod health
 - Detected CNPG-i plugins (e.g. Barman Cloud), with quick access to their logs
 
 ## Requirements
 
-**To develop this plugin:**
+- Headlamp >= 0.42 (Desktop, in-cluster, web, or Docker Desktop)
+- A Kubernetes cluster with the [CloudNativePG operator](https://cloudnative-pg.io/documentation/current/installation/) installed (the plugin manages CNPG custom resources)
 
-- [mise](https://mise.jdx.dev/) — manages the Node.js/npm versions used by this project
-- A local [Headlamp](https://headlamp.dev/) installation to load the plugin into
+## Installation
 
-Once packaged and distributed, the plugin only requires a [Headlamp](https://headlamp.dev/) installation to run — `mise` is a development-time dependency only.
+### Headlamp Desktop (Plugin Catalog)
 
-## Installation (local Headlamp)
+1. Open Headlamp and go to the Plugin Catalog
+2. Search for `cnpg-headlamp-plugin` and click **Install**
+3. Reload the UI (via the notification, or Navigation menu > Reload) — a **CloudNativePG** section appears in the sidebar
 
-From the repo root:
+### Manual install
 
-```bash
-mise exec -- npm install
-mise exec -- npm start
+1. Download the `cnpg-headlamp-plugin-<version>.tar.gz` archive from the [GitHub Releases](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases) page
+2. Install it following the [Headlamp plugin installation documentation](https://headlamp.dev/docs/latest/development/plugins/)
+
+### In-Cluster install
+
+Deploy Headlamp together with the plugin using the example manifest in [`deploy/headlamp-with-cnpg.yaml`](deploy/headlamp-with-cnpg.yaml), replacing `vX.Y.Z` with a [released plugin version](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases):
+
+```sh
+VERSION=vX.Y.Z # e.g. VERSION=v0.1.4
+curl -s https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/deploy/headlamp-with-cnpg.yaml \
+  | sed "s/vX.Y.Z/$VERSION/" \
+  | kubectl apply -f -
 ```
 
-`npm start` builds the plugin in watch mode; load it into your running Headlamp instance to see it, and changes will rebuild automatically as you edit.
+Note: with `-in-cluster`, Headlamp authenticates with its own ServiceAccount, so grant it the RBAC permissions described in the [Headlamp in-cluster documentation](https://headlamp.dev/docs/latest/installation/in-cluster/) and generate a login token for your user (`kubectl create token <serviceaccount>`).
 
-## Live-load smoke check
+## Contributing
 
-A green `tsc` / `lint` / `build` doesn't prove the plugin actually loads in Headlamp — a value imported from a path that isn't externalized at runtime resolves to `undefined` and throws on load, and a wrong `sidebar:` reference on a route fails silently instead of throwing. `scripts/cdp-verify.mjs` catches both by driving a running Headlamp over the Chrome DevTools Protocol.
-
-This requires a local clone of the [Headlamp](https://github.com/headlamp-k8s/headlamp) repo (to run Headlamp itself with the DevTools port open), in addition to this plugin's checkout. Both use `mise` and require Node 24.
-
-```bash
-# in this repo
-mise exec node@24 -- npm start                      # watch build, deploys into Headlamp
-
-# in the Headlamp checkout
-mise exec node@24 -- npm run install:all           # first-time setup only
-mise exec node@24 -- npm run start:with-app:debug   # backend :4466, vite :3000, Electron :9222
-
-# back in this repo
-mise exec node@24 -- node scripts/cdp-verify.mjs [cluster-name]   # default: kind-headlamp-test, or set HEADLAMP_CLUSTER
-```
-
-The script exits non-zero if this plugin fails to load or a route renders nothing.
-
-## Screenshots
-
-<table>
-  <tr>
-    <td><img src="img/operator-status.png" alt="Operator status page" width="400"></td>
-    <td><img src="img/cluster-list.png" alt="Cluster list" width="400"></td>
-  </tr>
-  <tr>
-    <td><img src="img/cluster-detail.png" alt="Cluster detail" width="400"></td>
-    <td><img src="img/cluster-form.png" alt="Cluster creation form" width="400"></td>
-  </tr>
-  <tr>
-    <td><img src="img/scheduled-backup-list.png" alt="Scheduled backups list" width="400"></td>
-    <td><img src="img/database-detail.png" alt="Database detail" width="400"></td>
-  </tr>
-</table>
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, the live-load
+smoke check, and regenerating screenshots.
 
 ## License
 

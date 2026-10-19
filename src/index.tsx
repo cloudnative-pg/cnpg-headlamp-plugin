@@ -19,8 +19,12 @@ import { BackupDetail } from './components/backups/Detail';
 import { BackupsList } from './components/backups/List';
 import { ClusterImageCatalogDetail } from './components/clusterimagecatalogs/Detail';
 import { ClusterImageCatalogsList } from './components/clusterimagecatalogs/List';
+import { CreateClusterPage } from './components/clusters/create/CreatePage';
 import { ClusterDetail } from './components/clusters/Detail';
 import { ClustersList } from './components/clusters/List';
+import { setupCnpgMenuIcon } from './components/common/cnpgMenuIcon';
+import { PodLogsPage } from './components/common/podLogs';
+import { PodTerminalPage } from './components/common/podTerminal';
 import { DatabaseRoleDetail } from './components/databaseroles/Detail';
 import { DatabaseRolesList } from './components/databaseroles/List';
 import { DatabaseDetail } from './components/databases/Detail';
@@ -49,7 +53,9 @@ registerSidebarEntry({
   // Points at the operator/plugin status overview rather than straight at the cluster list, so
   // clicking the top-level sidebar entry answers "is CNPG even installed correctly?" first.
   url: '/cnpg/status',
-  icon: 'mdi:database',
+  // Brand mark registered with Iconify in components/common/cnpgMenuIcon.ts (Headlamp only
+  // renders sidebar icons through Iconify strings, so the SVG can't be passed directly).
+  icon: setupCnpgMenuIcon(),
   parent: '',
   label: 'CloudNativePG',
 });
@@ -58,7 +64,7 @@ registerSidebarEntry({
   name: 'cnpg-status',
   url: '/cnpg/status',
   parent: 'cnpg-root',
-  label: 'Status',
+  label: 'Operator Status',
 });
 
 registerSidebarEntry({
@@ -189,6 +195,14 @@ registerRoute({
   // below, so this list keeps rendering instead of yielding to the detail route.
   exact: true,
   component: () => <ClustersList />,
+});
+
+registerRoute({
+  path: '/cnpg/clusters/new',
+  sidebar: 'cnpg-clusters',
+  name: 'CNPG Cluster New',
+  exact: true,
+  component: () => <CreateClusterPage />,
 });
 
 registerRoute({
@@ -359,4 +373,31 @@ registerRoute({
   name: 'CNPG Cluster Image Catalog',
   exact: true,
   component: () => <ClusterImageCatalogDetail />,
+});
+
+// Reached only via the "View logs" action on a pod (cluster/pooler/status pages), never directly
+// from the sidebar — but `sidebar: null` (rather than pointing at an existing entry) would hide
+// the *entire* sidebar while this route is active, not just skip highlighting an item, per
+// Sidebar.js's `sidebar.selected.sidebar === null` check. 'cnpg-clusters' keeps the sidebar
+// visible; which entry it highlights doesn't matter much since pods aren't in the sidebar anyway.
+// A standalone page rather than an Activity overlay: see the comment on PodLogsPage for why the
+// Activity approach broke in Headlamp 0.45.
+registerRoute({
+  path: '/cnpg/pods/:namespace/:name/logs',
+  sidebar: 'cnpg-clusters',
+  name: 'CNPG Pod Logs',
+  exact: true,
+  component: () => <PodLogsPage />,
+});
+
+// Same rationale as the route above (see its comment): reached only via the "Open terminal"
+// action, never the sidebar, and a standalone page rather than an Activity overlay because
+// Terminal's noDialog mode has the same '.xterm { height: 100vh }' assumption that broke inside
+// Headlamp 0.45's Activities framework.
+registerRoute({
+  path: '/cnpg/pods/:namespace/:name/terminal',
+  sidebar: 'cnpg-clusters',
+  name: 'CNPG Pod Terminal',
+  exact: true,
+  component: () => <PodTerminalPage />,
 });

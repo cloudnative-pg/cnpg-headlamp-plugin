@@ -1,0 +1,125 @@
+name: Release CNPG Headlamp Plugin
+
+on:
+  # Automatic path: release-please publishes a GitHub release with tag vX.Y.Z,
+  # this workflow builds the plugin tarball, attaches it to that release,
+  # and opens a PR updating artifacthub-pkg.yml on main (direct pushes to
+  # main are blocked by branch protection) so ArtifactHub picks it up.
+  release:
+    types: [published]
+  # Manual path: retry a failed run (or cut a release without release-please)
+  # by providing an existing tag such as v0.1.0.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to (re)build, e.g. v0.1.0'
+        required: true
+
+permissions: read-all
+
+jobs:
+  release:
+    name: Release CNPG Headlamp Plugin
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          # Tags are v-prefixed (v0.1.0); the plugin/tarball version is not (0.1.0).
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tarball=cnpg-headlamp-plugin-${VERSION}.tar.gz" >> $GITHUB_OUTPUT
+
+      - name: Align package.json version (before build)
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            if (pkg.version !== '${{ steps.version.outputs.version }}') {
+              pkg.version = '${{ steps.version.outputs.version }}';
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+              console.log('bumped package.json to ${{ steps.version.outputs.version }}');
+            } else {
+              console.log('package.json already at ${{ steps.version.outputs.version }}');
+            }
+          "
+
+      - name: Install dependencies, build and package
+        run: |
+          npm ci
+          npm run build
+          npm run package
+          ls -la ${{ steps.version.outputs.tarball }}
+
+      - name: Calculate SHA256 checksum
+        id: checksum
+        run: echo "value=$(sha256sum ${{ steps.version.outputs.tarball }} | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+
+      - name: Get current date
+        id: date
+        run: echo "value=$(date +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+      - name: Update artifacthub-pkg.yml
+        uses: fjogeleit/yaml-update-action@v0.17.0
+        with:
+          valueFile: artifacthub-pkg.yml
+          changes: |
+            {
+              "version": "${{ steps.version.outputs.version }}",
+              "createdAt": "${{ steps.date.outputs.value }}",
+              "annotations[\"headlamp/plugin/archive-url\"]": "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/${{ steps.version.outputs.tarball }}",
+              "annotations[\"headlamp/plugin/archive-checksum\"]": "SHA256:${{ steps.checksum.outputs.value }}"
+            }
+          commitChange: false
+
+      - name: Attach tarball to GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          prerelease: false
+          draft: false
+          fail_on_unmatched_files: true
+          files: ${{ steps.version.outputs.tarball }}
+          token: ${{ github.token }}
+
+      # main is protected against direct pushes, so the metadata update goes
+      # through a PR. REPO_PAT (instead of GITHUB_TOKEN) is used so that CI
+      # workflows trigger on the PR and required checks can pass.
+      - name: Open PR with release metadata
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.REPO_PAT }}
+          branch: chore/release-${{ steps.version.outputs.tag }}-metadata
+          delete-branch: true
+          add-paths: |
+            artifacthub-pkg.yml
+            package.json
+          signoff: true
+          commit-message: 'chore: release ${{ steps.version.outputs.tag }}'
+          title: 'chore: release ${{ steps.version.outputs.tag }}'
+          body: |
+            Automated release metadata for ${{ steps.version.outputs.tag }}:
+            points `artifacthub-pkg.yml` at the published plugin tarball
+            (URL + SHA256 checksum) so ArtifactHub picks up the new version.
+            Merging this PR completes the release.

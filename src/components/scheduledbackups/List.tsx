@@ -1,15 +1,20 @@
 import { Router } from '@kinvolk/headlamp-plugin/lib';
 import {
   ActionButton,
+  ColumnType,
   HoverInfoLabel,
+  Link,
   ResourceListView,
+  ResourceTableColumn,
   StatusLabel,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Button from '@mui/material/Button';
 import cronstrue from 'cronstrue';
+import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ScheduledBackup } from '../../resources/scheduledbackup';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
+import { ListPageHeader, SummaryStat } from '../common/ListHeader';
 import { launchScheduledBackupCreate } from './Create';
 import { launchTriggerBackup } from './TriggerBackup';
 
@@ -37,9 +42,25 @@ export function ScheduledBackupScheduleLabel({ schedule }: { schedule: string })
   return <HoverInfoLabel label={schedule} hoverInfo={described} />;
 }
 
-function scheduledBackupColumns(): any[] {
+function scheduledBackupStats(items: ScheduledBackup[]): SummaryStat[] {
+  const total = items.length;
+  const active = items.filter(item => !item.suspend).length;
+  const suspended = total - active;
   return [
-    'name',
+    { value: total, label: total === 1 ? 'Scheduled Backup' : 'Scheduled Backups' },
+    { value: active, label: 'Active' },
+    { value: suspended, label: 'Suspended', highlight: suspended > 0 },
+  ];
+}
+
+function scheduledBackupColumns(): (ResourceTableColumn<ScheduledBackup> | ColumnType)[] {
+  return [
+    {
+      id: 'name',
+      label: 'Name',
+      getValue: (item: ScheduledBackup) => item.getName(),
+      render: (item: ScheduledBackup) => <Link kubeObject={item} />,
+    },
     'namespace',
     {
       id: 'cluster',
@@ -84,6 +105,32 @@ function scheduledBackupColumns(): any[] {
   ];
 }
 
+function scheduledBackupActions(): ReactNode[] {
+  return [
+    <AuthDisabledButton
+      key="create-scheduled-backup"
+      item={ScheduledBackup}
+      authVerb="create"
+      deniedMessage="You don't have permission to create ScheduledBackups."
+    >
+      <Button variant="contained" color="primary" onClick={() => launchScheduledBackupCreate()}>
+        Create Scheduled Backup
+      </Button>
+    </AuthDisabledButton>,
+  ];
+}
+
+function ScheduledBackupListTitleDefault() {
+  const [backups] = ScheduledBackup.useList();
+  return (
+    <ListPageHeader
+      title="Scheduled Backups"
+      actions={scheduledBackupActions()}
+      stats={scheduledBackupStats(backups ?? [])}
+    />
+  );
+}
+
 export function ScheduledBackupsList() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -100,35 +147,22 @@ export function ScheduledBackupsList() {
     ? (allScheduledBackups ?? []).filter(item => item.clusterName === clusterFilter)
     : null;
 
-  const headerProps = {
-    // ResourceListView auto-injects Headlamp's own generic CreateResourceButton next to the
-    // title whenever resourceClass is set and titleSideActions isn't — suppress it here since
-    // our guided create form below already covers that slot via actions.
-    titleSideActions: [],
-    actions: [
-      <AuthDisabledButton
-        key="create-scheduled-backup"
-        item={ScheduledBackup}
-        authVerb="create"
-        deniedMessage="You don't have permission to create ScheduledBackups."
-      >
-        <Button variant="contained" color="primary" onClick={() => launchScheduledBackupCreate()}>
-          Create Scheduled Backup
-        </Button>
-      </AuthDisabledButton>,
-    ],
-  };
-
   if (clusterFilter) {
     return (
       <ResourceListView
-        title={`Scheduled Backups for ${clusterFilter}`}
+        title={
+          <ListPageHeader
+            title={`Scheduled Backups for ${clusterFilter}`}
+            actions={scheduledBackupActions()}
+            stats={scheduledBackupStats(filteredScheduledBackups ?? [])}
+          />
+        }
         backLink={createRouteURL('CNPG Cluster', {
           namespace: namespaceFilter,
           name: clusterFilter,
         })}
         data={filteredScheduledBackups}
-        headerProps={headerProps}
+        id="cnpg-scheduled-backups"
         columns={scheduledBackupColumns()}
       />
     );
@@ -136,9 +170,9 @@ export function ScheduledBackupsList() {
 
   return (
     <ResourceListView
-      title="Scheduled Backups"
+      title={<ScheduledBackupListTitleDefault />}
       resourceClass={ScheduledBackup}
-      headerProps={headerProps}
+      id="cnpg-scheduled-backups"
       columns={scheduledBackupColumns()}
     />
   );

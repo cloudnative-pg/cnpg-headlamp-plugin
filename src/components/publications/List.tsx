@@ -1,10 +1,17 @@
 import { Router } from '@kinvolk/headlamp-plugin/lib';
-import { ResourceListView } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import {
+  ColumnType,
+  Link,
+  ResourceListView,
+  ResourceTableColumn,
+} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Button from '@mui/material/Button';
+import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Publication } from '../../resources/publication';
 import { AppliedStatusLabel } from '../common/AppliedStatusLabel';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
+import { ListPageHeader, SummaryStat } from '../common/ListHeader';
 import { launchPublicationCreate } from './Create';
 
 const { createRouteURL } = Router;
@@ -25,9 +32,25 @@ export function PublicationTargetSummary({ publication }: { publication: Publica
   );
 }
 
-function publicationColumns(): any[] {
+function publicationStats(items: Publication[]): SummaryStat[] {
+  const total = items.length;
+  const applied = items.filter(item => item.applied === true).length;
+  const needsAttention = items.filter(item => item.applied === false).length;
   return [
-    'name',
+    { value: total, label: total === 1 ? 'Publication' : 'Publications' },
+    { value: applied, label: 'Applied' },
+    { value: needsAttention, label: 'Needs attention', highlight: needsAttention > 0 },
+  ];
+}
+
+function publicationColumns(): (ResourceTableColumn<Publication> | ColumnType)[] {
+  return [
+    {
+      id: 'name',
+      label: 'Name',
+      getValue: (item: Publication) => item.getName(),
+      render: (item: Publication) => <Link kubeObject={item} />,
+    },
     'namespace',
     {
       id: 'cluster',
@@ -61,6 +84,32 @@ function publicationColumns(): any[] {
   ];
 }
 
+function publicationActions(): ReactNode[] {
+  return [
+    <AuthDisabledButton
+      key="create-publication"
+      item={Publication}
+      authVerb="create"
+      deniedMessage="You don't have permission to create Publications."
+    >
+      <Button variant="contained" color="primary" onClick={() => launchPublicationCreate()}>
+        Create Publication
+      </Button>
+    </AuthDisabledButton>,
+  ];
+}
+
+function PublicationListTitleDefault() {
+  const [publications] = Publication.useList();
+  return (
+    <ListPageHeader
+      title="Publications"
+      actions={publicationActions()}
+      stats={publicationStats(publications ?? [])}
+    />
+  );
+}
+
 export function PublicationsList() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -77,35 +126,22 @@ export function PublicationsList() {
     ? (allPublications ?? []).filter(item => item.clusterName === clusterFilter)
     : null;
 
-  const headerProps = {
-    // ResourceListView auto-injects Headlamp's own generic CreateResourceButton next to the
-    // title whenever resourceClass is set and titleSideActions isn't — suppress it here since
-    // our guided create form below already covers that slot via actions.
-    titleSideActions: [],
-    actions: [
-      <AuthDisabledButton
-        key="create-publication"
-        item={Publication}
-        authVerb="create"
-        deniedMessage="You don't have permission to create Publications."
-      >
-        <Button variant="contained" color="primary" onClick={() => launchPublicationCreate()}>
-          Create Publication
-        </Button>
-      </AuthDisabledButton>,
-    ],
-  };
-
   if (clusterFilter) {
     return (
       <ResourceListView
-        title={`Publications for ${clusterFilter}`}
+        title={
+          <ListPageHeader
+            title={`Publications for ${clusterFilter}`}
+            actions={publicationActions()}
+            stats={publicationStats(filteredPublications ?? [])}
+          />
+        }
         backLink={createRouteURL('CNPG Cluster', {
           namespace: namespaceFilter,
           name: clusterFilter,
         })}
         data={filteredPublications}
-        headerProps={headerProps}
+        id="cnpg-publications"
         columns={publicationColumns()}
       />
     );
@@ -113,9 +149,9 @@ export function PublicationsList() {
 
   return (
     <ResourceListView
-      title="Publications"
+      title={<PublicationListTitleDefault />}
       resourceClass={Publication}
-      headerProps={headerProps}
+      id="cnpg-publications"
       columns={publicationColumns()}
     />
   );

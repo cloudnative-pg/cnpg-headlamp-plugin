@@ -1,10 +1,17 @@
 import { Router } from '@kinvolk/headlamp-plugin/lib';
-import { ResourceListView } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import {
+  ColumnType,
+  Link,
+  ResourceListView,
+  ResourceTableColumn,
+} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Button from '@mui/material/Button';
+import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Database } from '../../resources/database';
 import { AppliedStatusLabel } from '../common/AppliedStatusLabel';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
+import { ListPageHeader, SummaryStat } from '../common/ListHeader';
 import { launchDatabaseCreate } from './Create';
 
 const { createRouteURL } = Router;
@@ -13,9 +20,25 @@ export function DatabaseAppliedLabel({ database }: { database: Database }) {
   return <AppliedStatusLabel applied={database.applied} message={database.message} />;
 }
 
-function databaseColumns(): any[] {
+function databaseStats(items: Database[]): SummaryStat[] {
+  const total = items.length;
+  const applied = items.filter(item => item.applied === true).length;
+  const needsAttention = items.filter(item => item.applied === false).length;
   return [
-    'name',
+    { value: total, label: total === 1 ? 'Database' : 'Databases' },
+    { value: applied, label: 'Applied' },
+    { value: needsAttention, label: 'Needs attention', highlight: needsAttention > 0 },
+  ];
+}
+
+function databaseColumns(): (ResourceTableColumn<Database> | ColumnType)[] {
+  return [
+    {
+      id: 'name',
+      label: 'Name',
+      getValue: (item: Database) => item.getName(),
+      render: (item: Database) => <Link kubeObject={item} />,
+    },
     'namespace',
     {
       id: 'cluster',
@@ -47,6 +70,32 @@ function databaseColumns(): any[] {
   ];
 }
 
+function databaseActions(): ReactNode[] {
+  return [
+    <AuthDisabledButton
+      key="create-database"
+      item={Database}
+      authVerb="create"
+      deniedMessage="You don't have permission to create Databases."
+    >
+      <Button variant="contained" color="primary" onClick={() => launchDatabaseCreate()}>
+        Create Database
+      </Button>
+    </AuthDisabledButton>,
+  ];
+}
+
+function DatabaseListTitleDefault() {
+  const [databases] = Database.useList();
+  return (
+    <ListPageHeader
+      title="Databases"
+      actions={databaseActions()}
+      stats={databaseStats(databases ?? [])}
+    />
+  );
+}
+
 export function DatabasesList() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -63,35 +112,22 @@ export function DatabasesList() {
     ? (allDatabases ?? []).filter(item => item.clusterName === clusterFilter)
     : null;
 
-  const headerProps = {
-    // ResourceListView auto-injects Headlamp's own generic CreateResourceButton next to the
-    // title whenever resourceClass is set and titleSideActions isn't — suppress it here since
-    // our guided create form below already covers that slot via actions.
-    titleSideActions: [],
-    actions: [
-      <AuthDisabledButton
-        key="create-database"
-        item={Database}
-        authVerb="create"
-        deniedMessage="You don't have permission to create Databases."
-      >
-        <Button variant="contained" color="primary" onClick={() => launchDatabaseCreate()}>
-          Create Database
-        </Button>
-      </AuthDisabledButton>,
-    ],
-  };
-
   if (clusterFilter) {
     return (
       <ResourceListView
-        title={`Databases for ${clusterFilter}`}
+        title={
+          <ListPageHeader
+            title={`Databases for ${clusterFilter}`}
+            actions={databaseActions()}
+            stats={databaseStats(filteredDatabases ?? [])}
+          />
+        }
         backLink={createRouteURL('CNPG Cluster', {
           namespace: namespaceFilter,
           name: clusterFilter,
         })}
         data={filteredDatabases}
-        headerProps={headerProps}
+        id="cnpg-databases"
         columns={databaseColumns()}
       />
     );
@@ -99,9 +135,9 @@ export function DatabasesList() {
 
   return (
     <ResourceListView
-      title="Databases"
+      title={<DatabaseListTitleDefault />}
       resourceClass={Database}
-      headerProps={headerProps}
+      id="cnpg-databases"
       columns={databaseColumns()}
     />
   );

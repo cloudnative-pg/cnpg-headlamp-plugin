@@ -243,7 +243,8 @@ function ScheduledBackupCreateForm({ onClose }: { onClose: () => void }) {
 }
 
 // Opens the create form in an overlay, same convention as launchBackupCreate / launchPoolerCreate
-// / launchObjectStoreCreate / launchClusterCreate.
+// / launchObjectStoreCreate. (Cluster create is a full route page instead — see
+// components/clusters/create/CreatePage.tsx.)
 export function launchScheduledBackupCreate() {
   const activityId = 'cnpg-scheduled-backup-create';
   Activity.launch({

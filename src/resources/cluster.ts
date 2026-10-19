@@ -1,4 +1,11 @@
 import { KubeObject, KubeObjectInterface } from '@kinvolk/headlamp-plugin/lib/k8s/cluster';
+import {
+  FENCE_ALL_INSTANCES,
+  FENCED_INSTANCES_ANNOTATION,
+  parseFencedInstances,
+  updateFencedInstances,
+} from './fencing';
+import { parseBool } from './status';
 
 /** A single entry in Cluster.status.conditions (standard metav1.Condition shape). */
 export interface ClusterCondition {
@@ -68,6 +75,7 @@ export interface CnpgCluster extends KubeObjectInterface {
     maxSyncReplicas?: number;
     postgresql?: {
       synchronous?: SynchronousReplicaConfiguration;
+      parameters?: Record<string, string>;
     };
     storage?: StorageConfiguration;
     walStorage?: StorageConfiguration;
@@ -113,6 +121,19 @@ export interface CnpgCluster extends KubeObjectInterface {
 /** Cluster.status.phase value CNPG uses when everything is reconciled and healthy. */
 const PHASE_HEALTHY = 'Cluster in healthy state';
 
+/**
+ * Declarative hibernation annotation (see CNPG's `kubectl cnpg hibernate` command in
+ * internal/cmd/plugin/hibernate/cmd.go): 'on' requests hibernation (all instance pods are
+ * removed while PVCs are retained), 'off' (or absent) means the cluster should be running.
+ * This is only the *request* — whether the cluster actually is hibernated is reported by the
+ * operator via the `cnpg.io/hibernation` status condition (see HIBERNATION_CONDITION_TYPE).
+ */
+export const HIBERNATION_ANNOTATION = 'cnpg.io/hibernation';
+const HIBERNATION_ON = 'on';
+
+/** Type of the status condition the operator sets to report hibernation state. */
+export const HIBERNATION_CONDITION_TYPE = 'cnpg.io/hibernation';
+
 const CONDITION_CONTINUOUS_ARCHIVING = 'ContinuousArchiving';
 const CONDITION_LAST_BACKUP_SUCCEEDED = 'LastBackupSucceeded';
 
@@ -125,7 +146,7 @@ export class Cluster extends KubeObject<CnpgCluster> {
   static isNamespaced = true;
 
   // Seeds the "Create" YAML editor with a minimal working example instead of an empty object.
-  // The guided form is components/clusters/Create.tsx (launchClusterCreate) — this is only a
+  // The guided form is components/clusters/create/CreatePage.tsx — this is only a
   // fallback for anything that falls back to a raw-YAML create flow.
   static getBaseObject() {
     return {
@@ -170,6 +191,71 @@ export class Cluster extends KubeObject<CnpgCluster> {
 
   get phase(): string | undefined {
     return this.status.phase;
+  }
+
+  /**
+   * True when the operator reports the cluster as hibernated via the `cnpg.io/hibernation`
+   * status condition (`status: "True"`). This mirrors CNPG's own `isHibernated()` in
+   * internal/cmd/plugin/status/status.go, which likewise reads the condition rather than the
+   * annotation — the annotation is only the *request* (`on`), while the condition is the
+   * reconciled *state* (it stays `False` e.g. while pods are still terminating, and is absent
+   * entirely when hibernation was never requested). A hibernated cluster has no instance pods,
+   * so detail views built on pod/status data must treat it as a special case rather than an
+   * unhealthy cluster.
+   */
+  get isHibernated(): boolean {
+    return parseBool(this.getCondition(HIBERNATION_CONDITION_TYPE)?.status) === true;
+  }
+
+  /**
+   * Puts the cluster into hibernation (annotation `on`) or rehydrates it (`off`), mirroring
+   * `kubectl cnpg hibernate on|off`. Rehydration sets the annotation to `off` rather than
+   * removing it, matching the CLI — the operator treats `off` and absent identically.
+   */
+  setHibernated(hibernated: boolean): Promise<any> {
+    return this.patch({
+      metadata: {
+        annotations: {
+          [HIBERNATION_ANNOTATION]: hibernated ? HIBERNATION_ON : 'off',
+        },
+      },
+    } as any);
+  }
+
+  /**
+   * Instance names listed in the `cnpg.io/fencedInstances` annotation (`*` means all), or
+   * `undefined` when the annotation holds a value the operator itself would reject.
+   */
+  get fencedInstances(): string[] | undefined {
+    return parseFencedInstances(this.metadata.annotations?.[FENCED_INSTANCES_ANNOTATION]);
+  }
+
+  isInstanceFenced(instanceName: string): boolean {
+    const fenced = this.fencedInstances ?? [];
+    return fenced.includes(FENCE_ALL_INSTANCES) || fenced.includes(instanceName);
+  }
+
+  /**
+   * Fences or unfences one instance, mirroring `kubectl cnpg fencing on|off`. The patch carries
+   * the resourceVersion the list was computed from, so a concurrent change to the annotation
+   * makes the API server reject it (409) instead of silently dropping the other edit.
+   */
+  setInstanceFenced(instanceName: string, fenced: boolean): Promise<any> {
+    const current = this.fencedInstances;
+    if (current === undefined) {
+      return Promise.reject(
+        new Error(`the ${FENCED_INSTANCES_ANNOTATION} annotation has invalid syntax`)
+      );
+    }
+    const updated = updateFencedInstances(current, instanceName, fenced);
+    return this.patch({
+      metadata: {
+        resourceVersion: this.metadata.resourceVersion,
+        annotations: {
+          [FENCED_INSTANCES_ANNOTATION]: updated.length > 0 ? JSON.stringify(updated) : null,
+        },
+      },
+    } as any);
   }
 
   get isPhaseHealthy(): boolean {
@@ -252,8 +338,14 @@ export class Cluster extends KubeObject<CnpgCluster> {
    * - warning (yellow): phase is healthy, but WAL archiving and/or the last backup aren't confirmed good.
    * - success (green): phase is healthy, WAL archiving is working, and the last backup succeeded
    *   (or no backup has been configured/taken yet, in which case it isn't held against the cluster).
+   *
+   * A hibernated cluster has no status to judge, so it reports warning — never success (it isn't
+   * running) and never error (nothing is actually wrong). Its label reads 'Hibernated' instead.
    */
   get health(): ClusterHealth {
+    if (this.isHibernated) {
+      return 'warning';
+    }
     if (!this.isPhaseHealthy) {
       return 'error';
     }
@@ -264,6 +356,9 @@ export class Cluster extends KubeObject<CnpgCluster> {
   }
 
   get healthLabel(): string {
+    if (this.isHibernated) {
+      return 'Hibernated';
+    }
     switch (this.health) {
       case 'success':
         return 'Healthy';

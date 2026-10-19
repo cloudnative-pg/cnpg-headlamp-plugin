@@ -20,6 +20,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: kubernetes-sigs/headlamp
+          ref: "v0.46.0"
           path: headlamp
 
       - uses: actions/setup-node@v7
@@ -54,7 +55,7 @@ jobs:
 
       - name: Install CloudNativePG operator
         env:
-          CNPG_VERSION: '1.30.0'
+          CNPG_VERSION: '1.30.1'
         run: |
           CNPG_BRANCH="release-${CNPG_VERSION%.*}"
           kubectl apply --server-side -f \
@@ -119,14 +120,18 @@ jobs:
 
       - name: Start headless Chrome against the frontend (CDP :9222)
         run: |
-          # frontend/src/helpers/isElectron.ts detects Electron partly via a user-agent substring
-          # check. Headlamp's Home page (frontend/src/components/App/Home/index.tsx) auto-redirects
-          # to the single configured cluster's generic Overview page whenever !isElectron() and
-          # there's exactly one cluster — exactly this setup — which stomps every hash navigation
-          # this check does before it ever reaches the plugin's own routes. Spoofing the UA sidesteps
-          # that Headlamp-side special case without needing real Electron.
+          # Plain Chrome UA on purpose: spoofing Electron (e.g. via --user-agent)
+          # makes isElectron() true, which flips getAppUrl() to same-origin '/'
+          # (pushing plugin fetches through the :3000 dev proxy) and trips
+          # Headlamp 0.46's Plugin Development Mode gate, which fail-closes
+          # when window.desktopApi is absent. Without the spoof, plugin fetches
+          # go directly to the backend at :4466 (CORS is open with -dev) and
+          # development plugins load. Plain UA also means Headlamp 0.46 renders
+          # a BrowserRouter (HashRouter is Electron-only), so cdp-verify.mjs
+          # navigates by clicking sidebar links instead of setting
+          # window.location.hash. The single-cluster Home auto-redirect just
+          # lands the fresh page in cluster context, where the click walk starts.
           nohup google-chrome --headless=new --disable-gpu --no-sandbox \
-            --user-agent="Mozilla/5.0 Electron/32.0.0 Chrome Safari" \
             --remote-debugging-port=9222 http://localhost:3000 \
             > chrome.log 2>&1 &
           disown
