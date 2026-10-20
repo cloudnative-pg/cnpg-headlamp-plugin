@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react';
 import { K8s, Router } from '@kinvolk/headlamp-plugin/lib';
 import {
   ActionButton,
+  AuthVisible,
   ConditionsTable,
   DeleteButton,
   EditButton,
@@ -40,6 +41,7 @@ import { Cluster } from '../../resources/cluster';
 import { FailoverQuorum } from '../../resources/failoverQuorum';
 import { Pooler } from '../../resources/pooler';
 import { ScheduledBackup } from '../../resources/scheduledbackup';
+import { launchBackupCreate } from '../backups/Create';
 import { BackupPhaseLabel } from '../backups/List';
 import { CnpgLogo } from '../common/CnpgLogo';
 import { Pod, PodPhaseLabel, PodStatusLabel } from '../common/podActions';
@@ -1906,6 +1908,40 @@ function ConfigurationTab({ cluster, lease }: { cluster: Cluster; lease: Lease |
   );
 }
 
+// ActionButton doesn't accept a bare `disabled` prop (only `iconButtonProps.disabled`), so this
+// can't reuse AuthDisabledButton — the permission check is wired in directly instead, following
+// the same allowed-until-checked default as switchover.tsx.
+function TakeBackupAction({ cluster }: { cluster: Cluster }) {
+  const [allowed, setAllowed] = useState(true);
+  const button = (
+    <ActionButton
+      description="Take Backup"
+      icon="mdi:cloud-upload-outline"
+      onClick={() => launchBackupCreate(cluster)}
+      iconButtonProps={{ disabled: !allowed }}
+    />
+  );
+  return (
+    <>
+      <AuthVisible
+        item={Backup}
+        authVerb="create"
+        namespace={cluster.getNamespace()}
+        onAuthResult={({ allowed: result }) => setAllowed(result)}
+      >
+        {null}
+      </AuthVisible>
+      {allowed ? (
+        button
+      ) : (
+        <Tooltip title="You don't have permission to create Backups.">
+          <span>{button}</span>
+        </Tooltip>
+      )}
+    </>
+  );
+}
+
 function ClusterHeaderActions({ cluster }: { cluster: Cluster }) {
   const history = useHistory();
   return (
@@ -1937,17 +1973,7 @@ function ClusterHeaderActions({ cluster }: { cluster: Cluster }) {
           )
         }
       />
-      <ActionButton
-        description="View Backups"
-        icon="mdi:backup-restore"
-        onClick={() =>
-          history.push(
-            `${createRouteURL(
-              'CNPG Backups'
-            )}?cluster=${cluster.getName()}&namespace=${cluster.getNamespace()}`
-          )
-        }
-      />
+      <TakeBackupAction cluster={cluster} />
       <ActionButton
         description="View Scheduled Backups"
         icon="mdi:calendar-clock"

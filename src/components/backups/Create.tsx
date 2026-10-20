@@ -57,10 +57,18 @@ function buildBackupManifest(state: BackupFormState) {
   };
 }
 
-function BackupCreateForm({ onClose }: { onClose: () => void }) {
+function BackupCreateForm({
+  initialCluster,
+  onClose,
+}: {
+  initialCluster?: Cluster;
+  onClose: () => void;
+}) {
   const { enqueueSnackbar } = useSnackbar();
   const [clusters] = Cluster.useList();
-  const [clusterKey, setClusterKey] = useState('');
+  const [clusterKey, setClusterKey] = useState(
+    initialCluster ? `${initialCluster.getNamespace()}/${initialCluster.getName()}` : ''
+  );
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -123,6 +131,7 @@ function BackupCreateForm({ onClose }: { onClose: () => void }) {
           labelId="backup-cluster-label"
           label={<RequiredLabel label="Cluster" required />}
           value={clusterKey}
+          disabled={!!initialCluster}
           onChange={e => setClusterKey(e.target.value)}
         >
           {(clusters ?? []).map(cluster => {
@@ -171,13 +180,21 @@ function BackupCreateForm({ onClose }: { onClose: () => void }) {
 // Opens the create form in an overlay, same convention as launchPoolerCreate /
 // launchObjectStoreCreate. (Cluster create is a full route page instead — see
 // components/clusters/create/CreatePage.tsx.)
-export function launchBackupCreate() {
-  const activityId = 'cnpg-backup-create';
+export function launchBackupCreate(initialCluster?: Cluster) {
+  // Headlamp reuses an activity's existing form when its ID is launched again.
+  const activityId = initialCluster
+    ? `cnpg-backup-create-${initialCluster.getNamespace()}/${initialCluster.getName()}`
+    : 'cnpg-backup-create';
   Activity.launch({
     id: activityId,
     title: 'Create Backup',
     icon: <Icon icon="mdi:plus-circle" width="100%" height="100%" />,
     location: 'split-right',
-    content: <BackupCreateForm onClose={() => Activity.close(activityId)} />,
+    content: (
+      <BackupCreateForm
+        initialCluster={initialCluster}
+        onClose={() => Activity.close(activityId)}
+      />
+    ),
   });
 }
