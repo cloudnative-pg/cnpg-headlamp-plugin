@@ -98,6 +98,40 @@ export function parseCnpgLogLine(raw: string): ParsedLogLine {
   }
 }
 
+// zap's `ts` is either an ISO string or epoch seconds (float), depending on the CNPG version.
+export function parseTimestamp(ts: unknown): Date | undefined {
+  if (ts === undefined || ts === null || ts === '') {
+    return undefined;
+  }
+  const date = typeof ts === 'number' ? new Date(ts * 1000) : new Date(String(ts));
+  return isNaN(date.getTime()) ? undefined : date;
+}
+
+export function formatTime(ts: unknown): string {
+  const date = parseTimestamp(ts);
+  return date ? date.toLocaleTimeString([], { hour12: false }) : String(ts ?? '');
+}
+
+export function formatFullTimestamp(ts: unknown): string {
+  const date = parseTimestamp(ts);
+  return date ? date.toISOString() : String(ts ?? '');
+}
+
+export function prettyJson(raw: string): string {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}
+
+// Postgres record fields worth their own section when present, in display order.
+export const POSTGRES_CONTEXT_KEYS = ['query', 'detail', 'hint', 'context', 'internal_query'];
+
+export function formatLogValue(value: unknown): string {
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
+
 const ANSI_RESET = '\x1b[0m';
 
 /** ANSI color codes, keyed by Postgres/zap severity — rendered natively by LogViewer's xterm.js. */
@@ -117,12 +151,7 @@ function formatExtraFields(extra: Record<string, unknown>): string {
   if (entries.length === 0) {
     return '';
   }
-  return (
-    ' ' +
-    entries
-      .map(([key, value]) => `${key}=${typeof value === 'string' ? value : JSON.stringify(value)}`)
-      .join(' ')
-  );
+  return ' ' + entries.map(([key, value]) => `${key}=${formatLogValue(value)}`).join(' ');
 }
 
 export function formatCnpgLogLine(entry: ParsedLogLine): string {

@@ -30,7 +30,7 @@ List and detail views, plus a guided creation form.
 
 - Traffic-light health indicator (phase, WAL archiving, last backup)
 - Instance roles and synchronous replication warnings
-- Per-instance Postgres logs: compact Time/Severity/Logger/Message table with severity badges, filters (container, level, logger, search), live-following (auto-scrolls while live), and a detail panel for the selected record (PostgreSQL context, additional fields, expandable raw JSON)
+- Per-instance Postgres logs (filterable, color-coded, live-following)
 - A `psql` terminal against the primary or any replica
 - A **Live Metrics** section on the cluster's detail page, scraped from each instance's CNPG Prometheus exporter (port 9187) via the Kubernetes API's pod proxy subresource — no `psql` or exec involved. It is organized into collapsible categories:
   - **Replication & Archiving** (primary only): connected standbys, replication lag, inactive slots, WAL archiving failures, backlog and timing, sync replica counts, plus per-standby and per-slot detail tables

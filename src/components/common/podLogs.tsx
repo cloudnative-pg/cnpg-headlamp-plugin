@@ -10,7 +10,15 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useHistory, useParams } from 'react-router-dom';
-import { parseCnpgLogLines, ParsedLogLine } from '../../resources/cnpgLog';
+import {
+  formatFullTimestamp,
+  formatLogValue,
+  formatTime,
+  parseCnpgLogLines,
+  ParsedLogLine,
+  POSTGRES_CONTEXT_KEYS,
+  prettyJson,
+} from '../../resources/cnpgLog';
 import { Pod } from './podActions';
 
 const { createRouteURL } = Router;
@@ -84,38 +92,50 @@ function SeverityBadge({ severity }: { severity: string }) {
   );
 }
 
-// zap's `ts` is either an ISO string or epoch seconds (float), depending on the CNPG version.
-function parseTimestamp(ts: unknown): Date | undefined {
-  if (ts === undefined || ts === null || ts === '') {
-    return undefined;
-  }
-  const date = typeof ts === 'number' ? new Date(ts * 1000) : new Date(String(ts));
-  return isNaN(date.getTime()) ? undefined : date;
-}
+// Shared by the header row and every log row so the columns can't drift apart.
+const LOG_GRID_COLUMNS = '80px 84px 160px 1fr';
 
-function formatTime(ts: unknown): string {
-  const date = parseTimestamp(ts);
-  return date ? date.toLocaleTimeString([], { hour12: false }) : String(ts ?? '');
-}
-
-function formatFullTimestamp(ts: unknown): string {
-  const date = parseTimestamp(ts);
-  return date ? date.toISOString() : String(ts ?? '');
-}
-
-function prettyJson(raw: string): string {
-  try {
-    return JSON.stringify(JSON.parse(raw), null, 2);
-  } catch {
-    return raw;
-  }
-}
-
-// Postgres record fields worth their own section when present, in display order.
-const POSTGRES_CONTEXT_KEYS = ['query', 'detail', 'hint', 'context', 'internal_query'];
-
-function formatValue(value: unknown): string {
-  return typeof value === 'string' ? value : JSON.stringify(value);
+function LogRow({
+  entry,
+  index,
+  selected,
+  onSelect,
+}: {
+  entry: ParsedLogLine;
+  index: number;
+  selected: boolean;
+  onSelect: (index: number) => void;
+}) {
+  return (
+    <Box
+      onClick={() => onSelect(index)}
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: LOG_GRID_COLUMNS,
+        gap: 1,
+        px: 1,
+        py: 0.25,
+        alignItems: 'center',
+        cursor: 'pointer',
+        bgcolor: theme => rowTint(theme, entry.severity, 0.08),
+        '&:hover': { bgcolor: theme => rowTint(theme, entry.severity, 0.18) },
+        // Selected rows get a stronger tint plus a left accent bar.
+        ...(selected && {
+          bgcolor: theme => rowTint(theme, entry.severity, 0.25),
+          boxShadow: theme => `inset 3px 0 0 ${theme.palette.primary.main}`,
+        }),
+      }}
+    >
+      <span>{formatTime(entry.ts)}</span>
+      <SeverityBadge severity={entry.severity} />
+      <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {entry.logger ?? '-'}
+      </Box>
+      <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {entry.message}
+      </Box>
+    </Box>
+  );
 }
 
 function FieldRow({ label, value }: { label: string; value: string }) {
@@ -196,7 +216,7 @@ function LogDetails({
                 {key}
               </Typography>
               <Box component="pre" sx={codeSx}>
-                {formatValue(entry.extra[key])}
+                {formatLogValue(entry.extra[key])}
               </Box>
             </Box>
           ))}
@@ -206,7 +226,7 @@ function LogDetails({
       {additional.length > 0 && (
         <DetailSection title="Additional fields">
           {additional.map(([key, value]) => (
-            <FieldRow key={key} label={key} value={formatValue(value)} />
+            <FieldRow key={key} label={key} value={formatLogValue(value)} />
           ))}
         </DetailSection>
       )}
@@ -382,7 +402,7 @@ function PodLogViewer({ pod }: { pod: Pod }) {
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: '80px 84px 160px 1fr',
+              gridTemplateColumns: LOG_GRID_COLUMNS,
               gap: 1,
               px: 1,
               py: 0.5,
@@ -401,37 +421,13 @@ function PodLogViewer({ pod }: { pod: Pod }) {
             <span>Message</span>
           </Box>
           {displayLogs.map(({ entry, index }) => (
-            <Box
+            <LogRow
               key={index}
-              onClick={() => {
-                setSelected(index);
-              }}
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: '80px 84px 160px 1fr',
-                gap: 1,
-                px: 1,
-                py: 0.25,
-                alignItems: 'center',
-                cursor: 'pointer',
-                bgcolor: theme => rowTint(theme, entry.severity, 0.08),
-                '&:hover': { bgcolor: theme => rowTint(theme, entry.severity, 0.18) },
-                // Selected rows get a stronger tint plus a left accent bar.
-                ...(index === selected && {
-                  bgcolor: theme => rowTint(theme, entry.severity, 0.25),
-                  boxShadow: theme => `inset 3px 0 0 ${theme.palette.primary.main}`,
-                }),
-              }}
-            >
-              <span>{formatTime(entry.ts)}</span>
-              <SeverityBadge severity={entry.severity} />
-              <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {entry.logger ?? '-'}
-              </Box>
-              <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {entry.message}
-              </Box>
-            </Box>
+              entry={entry}
+              index={index}
+              selected={index === selected}
+              onSelect={setSelected}
+            />
           ))}
         </Box>
 
