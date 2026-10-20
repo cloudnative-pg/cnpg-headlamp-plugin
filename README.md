@@ -93,14 +93,15 @@ List and detail views for managing available Postgres operand images.
 
 ### In-Cluster install
 
-Deploy Headlamp together with the plugin using the example manifest in [`deploy/headlamp-with-cnpg.yaml`](deploy/headlamp-with-cnpg.yaml), replacing `vX.Y.Z` with a [released plugin version](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases):
+Deploy Headlamp together with the plugin using the example manifest in [`deploy/headlamp-with-cnpg.yaml`](deploy/headlamp-with-cnpg.yaml), which is pinned to the latest released plugin version:
 
 ```sh
-VERSION=vX.Y.Z # e.g. VERSION=v0.1.4
-curl -s https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/deploy/headlamp-with-cnpg.yaml \
-  | sed "s/vX.Y.Z/$VERSION/" \
-  | kubectl apply -f -
+kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/deploy/headlamp-with-cnpg.yaml
 ```
+
+<!-- x-release-please-start-version -->
+To install a specific [released plugin version](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases), edit the `ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:v0.1.5` image tag in the manifest.
+<!-- x-release-please-end -->
 
 Note: with `-in-cluster`, Headlamp authenticates with its own ServiceAccount, so grant it the RBAC permissions described in the [Headlamp in-cluster documentation](https://headlamp.dev/docs/latest/installation/in-cluster/) and generate a login token for your user (`kubectl create token <serviceaccount>`).
 
