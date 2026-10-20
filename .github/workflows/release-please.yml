@@ -27,7 +27,9 @@ jobs:
             --token="${{ secrets.REPO_PAT }}" \
             --repo-url="${{ github.repository }}" \
             --bump-minor-pre-major=true \
+            --include-commit-authors=true \
             --signoff "Peggie <info@cloudnative-pg.io>";
           npx release-please github-release \
             --token="${{ secrets.REPO_PAT }}" \
             --repo-url="${{ github.repository }}" \
+            --include-commit-authors=true \
