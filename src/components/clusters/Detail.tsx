@@ -40,7 +40,9 @@ import { Cluster } from '../../resources/cluster';
 import { FailoverQuorum } from '../../resources/failoverQuorum';
 import { Pooler } from '../../resources/pooler';
 import { ScheduledBackup } from '../../resources/scheduledbackup';
+import { launchBackupCreate } from '../backups/Create';
 import { BackupPhaseLabel } from '../backups/List';
+import { AuthDisabledButton } from '../common/AuthDisabledButton';
 import { CnpgLogo } from '../common/CnpgLogo';
 import { Pod, PodPhaseLabel, PodStatusLabel } from '../common/podActions';
 import { ViewLogsButton } from '../common/podLogs';
@@ -1937,17 +1939,16 @@ function ClusterHeaderActions({ cluster }: { cluster: Cluster }) {
           )
         }
       />
-      <ActionButton
-        description="View Backups"
-        icon="mdi:backup-restore"
-        onClick={() =>
-          history.push(
-            `${createRouteURL(
-              'CNPG Backups'
-            )}?cluster=${cluster.getName()}&namespace=${cluster.getNamespace()}`
-          )
-        }
-      />
+      <AuthDisabledButton
+        item={Backup}
+        authVerb="create"
+        namespace={cluster.getNamespace()}
+        deniedMessage="You don't have permission to create Backups."
+      >
+        <Button variant="contained" color="primary" onClick={() => launchBackupCreate(cluster)}>
+          Take Backup
+        </Button>
+      </AuthDisabledButton>
       <ActionButton
         description="View Scheduled Backups"
         icon="mdi:calendar-clock"
