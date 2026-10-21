@@ -22,12 +22,19 @@ jobs:
           node-version: 24
       # TODO: remove bump-minor-pre-major when in production. It prevents
       #   release-please from bumping the major version on breaking changes.
+      #
+      # github-release must run before release-pr: with changelog-type
+      # "github", release-pr builds its changelog via GitHub's generate-notes
+      # API, which requires the previous release's tag to already exist.
+      # That tag is only created by github-release, which is a no-op until
+      # the manifest's pending version has actually landed on main — so
+      # running release-pr first would 400 on a tag that doesn't exist yet.
       - run: |
+          npx release-please github-release \
+            --token="${{ secrets.REPO_PAT }}" \
+            --repo-url="${{ github.repository }}";
           npx release-please release-pr \
             --token="${{ secrets.REPO_PAT }}" \
             --repo-url="${{ github.repository }}" \
             --bump-minor-pre-major=true \
             --signoff "Peggie <info@cloudnative-pg.io>";
-          npx release-please github-release \
-            --token="${{ secrets.REPO_PAT }}" \
-            --repo-url="${{ github.repository }}" \
