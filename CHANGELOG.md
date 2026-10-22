@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.1.6 (2026-10-22)
+
+## What's Changed
+* chore: release v0.1.4 by @cnpg-bot in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/77
+* chore(deps-dev): bump fast-uri from 3.1.6 to 3.1.8 by @dependabot[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/78
+* feat(clusters): add hibernation and rehydration support by @leonardoce in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/80
+* chore(deps-dev): bump undici from 7.29.0 to 7.30.0 by @dependabot[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/82
+* chore(deps): bump brace-expansion by @dependabot[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/84
+* chore(deps): update dependency cronstrue to v3.29.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/83
+* chore(deps): update dependency js-yaml to v5.4.3 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/85
+* chore(deps-dev): bump postcss-selector-parser from 7.1.5 to 7.1.6 by @dependabot[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/87
+* chore(deps): update dependency cronstrue to v3.30.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/86
+* chore(deps-dev): bump source-map-js from 1.2.1 to 1.2.2 by @dependabot[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/88
+* chore(deps): update dependency cronstrue to v3.31.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/89
+* chore(deps): update dependency cronstrue to v3.32.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/91
+* Add GitHub Actions workflow for plugin release by @cthtrifork in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/79
+* chore(deps): update actions/setup-node action to v7.1.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/104
+* feat(status): add install guide to the status page by @TamaraNocentini in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/102
+* feat(clusters): add fence and unfence actions for instances by @MatheuslFavaretto in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/103
+* feat(objectstores): add Recover action to the recovery window by @MatheuslFavaretto in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/107
+* chore(deps): update dependency kubernetes-sigs/headlamp to v0.46.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/112
+* chore(deps): update dependency vitest to v4.1.12 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/109
+* chore(deps): update dependency js-yaml to v5.5.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/111
+* chore(deps): update dependency cronstrue to v3.33.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/117
+* chore: update component owners by @gbartolini in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/118
+* feat(logs): redesign pod log viewer with details panel by @TamaraNocentini in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/115
+* chore: pin plugin version via release-please extra-files by @MatheuslFavaretto in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/116
+* chore(release): show contributors in release notes by @leonardoce in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/122
+* chore(release): use include-commit-authors as a manifest object by @leonardoce in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/123
+* chore(deps): update dependency cronstrue to v3.37.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/120
+* fix(clusters): open backup creation from cluster details by @Brilly-Bohyun in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/119
+* feat(ci): use GitHub changelog style by @leonardoce in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/124
+* chore(ci): adopt github-style changelog by @leonardoce in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/125
+* fix(release): release as 0.1.6 by @leonardoce in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/129
+* chore(ci): enable workflow dispatch by @leonardoce in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/130
+* chore(deps): update dependency cronstrue to v3.38.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/132
+
+## New Contributors
+* @cthtrifork made their first contribution in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/79
+* @MatheuslFavaretto made their first contribution in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/103
+* @Brilly-Bohyun made their first contribution in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/119
+
+**Full Changelog**: https://github.com/cloudnative-pg/cnpg-headlamp-plugin/compare/v0.1.4...v0.1.6
+
 ## [0.1.4](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/compare/v0.1.3...v0.1.4) (2026-09-28)
 
 

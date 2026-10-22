@@ -100,7 +100,7 @@ kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-
 ```
 
 <!-- x-release-please-start-version -->
-To install a specific [released plugin version](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases), edit the `ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:v0.1.5` image tag in the manifest.
+To install a specific [released plugin version](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases), edit the `ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:v0.1.6` image tag in the manifest.
 <!-- x-release-please-end -->
 
 Note: with `-in-cluster`, Headlamp authenticates with its own ServiceAccount, so grant it the RBAC permissions described in the [Headlamp in-cluster documentation](https://headlamp.dev/docs/latest/installation/in-cluster/) and generate a login token for your user (`kubectl create token <serviceaccount>`).
