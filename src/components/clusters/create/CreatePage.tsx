@@ -824,6 +824,7 @@ function StorageTab({ state, update, newRowId }: TabProps) {
 
 function BackupTab({ state, update, newRowId }: TabProps) {
   const [objectStores] = ObjectStore.useList({ namespace: state.namespace });
+  const [pluginConfigurations] = PluginConfiguration.useList({ namespace: state.namespace });
   const [snapshotClasses] = VolumeSnapshotClass.useList();
 
   return (
@@ -854,6 +855,7 @@ function BackupTab({ state, update, newRowId }: TabProps) {
               onChange={e => update({ backupKind: e.target.value as BackupKind })}
             >
               <MenuItem value="barman">Barman Cloud plugin — ObjectStore + server</MenuItem>
+              <MenuItem value="klio">Klio plugin — Client Config + server</MenuItem>
               <MenuItem value="custom">Custom CNPG-I plugin — free-form name + parameters</MenuItem>
             </Select>
           </FormControl>
@@ -917,6 +919,33 @@ function BackupTab({ state, update, newRowId }: TabProps) {
                   </Select>
                 </FormControl>
               )}
+            </>
+          )}
+
+          {state.backupKind === 'klio' && (
+            <>
+              <FormControl fullWidth margin="normal">
+                <InputLabel id="create-cluster-backup-pluginconfig-label">
+                  <RequiredLabel label="Plugin configuration" required />
+                </InputLabel>
+                <Select
+                  labelId="create-cluster-backup-pluginconfig-label"
+                  label={<RequiredLabel label="Plugin configuration" required />}
+                  value={state.backupPluginConfigurationRef}
+                  onChange={e => update({ backupPluginConfigurationRef: e.target.value })}
+                >
+                  {(pluginConfigurations ?? []).map(pc => (
+                    <MenuItem key={pc.getName()} value={pc.getName()}>
+                      {pc.getName()}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Typography variant="body2" color="text.secondary">
+                Klio streams WAL directly to the server — add{' '}
+                <code>local replication all peer map=local</code> to PostgreSQL pg_hba (Postgres
+                tab) so streaming can connect.
+              </Typography>
             </>
           )}
 
