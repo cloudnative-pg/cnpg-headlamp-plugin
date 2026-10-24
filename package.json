@@ -35,10 +35,12 @@
   },
   "overrides": {
     "typescript": "5.9.3",
-    "vitest": "4.1.12"
+    "vitest": "$vitest"
   },
   "devDependencies": {
-    "@kinvolk/headlamp-plugin": "^0.14.0"
+    "@kinvolk/headlamp-plugin": "^0.14.0",
+    "@types/node": "^24.19.2",
+    "vitest": "5.0.5"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
