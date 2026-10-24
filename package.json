@@ -1,6 +1,6 @@
 {
   "name": "cnpg-headlamp-plugin",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "CloudNativePG Headlamp Plugin",
   "scripts": {
     "start": "headlamp-plugin start",
