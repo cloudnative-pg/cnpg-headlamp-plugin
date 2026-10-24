@@ -1,5 +1,6 @@
 import { Icon } from '@iconify/react';
 import { K8s, Router } from '@kinvolk/headlamp-plugin/lib';
+import { AuthVisible } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -171,6 +172,81 @@ function CheckList({ items }: { items: string[] }) {
   );
 }
 
+const INSTALL_DENIED_MESSAGE =
+  "You don't have permission to install components in this cluster. Ask a cluster administrator.";
+
+// Button that opens the App Catalog install flow, disabled with an explanatory tooltip for users
+// who can't create Deployments. AuthDisabledButton injects `disabled` into the inner button on an
+// RBAC deny and adds the denied-message tooltip itself, so the inner button drops its own
+// tooltip then. `blocked` is the separate prerequisite block (not a permission issue).
+function InstallButton({
+  tooltip,
+  blocked,
+  onClick,
+  startIcon,
+  children,
+}: {
+  tooltip?: string;
+  blocked?: boolean;
+  onClick: () => void;
+  startIcon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <AuthDisabledButton
+      item={K8s.ResourceClasses.Deployment}
+      authVerb="create"
+      deniedMessage={INSTALL_DENIED_MESSAGE}
+    >
+      <InnerInstallButton
+        title={tooltip}
+        blocked={!!blocked}
+        onClick={onClick}
+        startIcon={startIcon}
+      >
+        {children}
+      </InnerInstallButton>
+    </AuthDisabledButton>
+  );
+}
+
+function InnerInstallButton({
+  title,
+  blocked,
+  disabled,
+  onClick,
+  startIcon,
+  children,
+}: {
+  title?: string;
+  blocked: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  startIcon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const button = (
+    <Button
+      variant="outlined"
+      fullWidth
+      disabled={blocked || disabled}
+      startIcon={startIcon}
+      endIcon={<Icon icon="mdi:open-in-new" width={14} height={14} />}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
+  // Tooltip needs a non-disabled wrapper to fire while the button is disabled.
+  return title && !disabled ? (
+    <Tooltip title={title}>
+      <span>{button}</span>
+    </Tooltip>
+  ) : (
+    button
+  );
+}
+
 function NamespaceCreateButton({ name, createdFor }: { name: string; createdFor: string }) {
   const { enqueueSnackbar } = useSnackbar();
   const [creating, setCreating] = useState(false);
@@ -242,6 +318,9 @@ function CustomNamespaceCreate({ createdFor }: { createdFor: string }) {
   const { enqueueSnackbar } = useSnackbar();
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
+  // Fails open until the check resolves, like AuthDisabledButton; the button next to the field
+  // runs its own check, this one only drives the text input.
+  const [allowed, setAllowed] = useState(true);
   const NamespaceClass = K8s.ResourceClasses.Namespace;
   const trimmed = name.trim().toLowerCase();
   const valid = trimmed.length > 0 && NamespaceClass.isValidNamespaceFormat(trimmed);
@@ -256,18 +335,30 @@ function CustomNamespaceCreate({ createdFor }: { createdFor: string }) {
         minWidth: 180,
       }}
     >
-      <TextField
-        size="small"
-        label="Custom namespace"
-        placeholder="e.g. my-cnpg"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        error={name.length > 0 && !valid}
-        helperText={
-          name.length > 0 && !valid ? 'Lowercase letters, numbers and dashes.' : undefined
-        }
-        sx={{ flexGrow: 1 }}
-      />
+      <AuthVisible
+        item={NamespaceClass}
+        authVerb="create"
+        onAuthResult={({ allowed: result }) => setAllowed(result)}
+      >
+        {null}
+      </AuthVisible>
+      <Tooltip title={allowed ? '' : "You don't have permission to create Namespaces."}>
+        <Box component="span" sx={{ flexGrow: 1, display: 'flex' }}>
+          <TextField
+            size="small"
+            label="Custom namespace"
+            placeholder="e.g. my-cnpg"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            error={name.length > 0 && !valid}
+            helperText={
+              name.length > 0 && !valid ? 'Lowercase letters, numbers and dashes.' : undefined
+            }
+            disabled={!allowed}
+            sx={{ flexGrow: 1 }}
+          />
+        </Box>
+      </Tooltip>
       <AuthDisabledButton
         item={NamespaceClass}
         authVerb="create"
@@ -604,15 +695,12 @@ export function ComponentCards({
                     Installed
                   </Button>
                 ) : (
-                  <Button
-                    variant="outlined"
-                    fullWidth
+                  <InstallButton
                     startIcon={<Icon icon="mdi:cube-outline" />}
-                    endIcon={<Icon icon="mdi:open-in-new" width={14} height={14} />}
                     onClick={() => openAppCatalog(CHARTS.cnpg)}
                   >
                     Install CloudNativePG
-                  </Button>
+                  </InstallButton>
                 )}
                 <LearnMoreRow docsUrl={DOC_URLS.cnpg} />
               </Box>
@@ -667,7 +755,11 @@ export function ComponentCards({
                       'cert-manager'
                     )}
                   />
-                  <RequiredValuesNote values={'crds:\n  enabled: true'} />
+                  {/* Install-time guidance, so only shown to users who can install (same check as the
+                      Install buttons); AuthVisible hides its children when denied. */}
+                  <AuthVisible item={K8s.ResourceClasses.Deployment} authVerb="create">
+                    <RequiredValuesNote values={'crds:\n  enabled: true'} />
+                  </AuthVisible>
                 </>
               )}
               <Box sx={{ mt: 'auto', pt: 2 }}>
@@ -681,16 +773,12 @@ export function ComponentCards({
                     Installed
                   </Button>
                 ) : (
-                  <Tooltip title="Opens the official cert-manager chart in the Headlamp App Catalog (available in Headlamp Desktop).">
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      endIcon={<Icon icon="mdi:open-in-new" width={14} height={14} />}
-                      onClick={() => openAppCatalog(CHARTS.certManager)}
-                    >
-                      Install via App Catalog
-                    </Button>
-                  </Tooltip>
+                  <InstallButton
+                    tooltip="Opens the official cert-manager chart in the Headlamp App Catalog (available in Headlamp Desktop)."
+                    onClick={() => openAppCatalog(CHARTS.certManager)}
+                  >
+                    Install via App Catalog
+                  </InstallButton>
                 )}
                 <LearnMoreRow docsUrl={DOC_URLS.certManager} />
               </Box>
@@ -750,28 +838,19 @@ export function ComponentCards({
                     Installed
                   </Button>
                 ) : (
-                  <Tooltip
-                    title={
+                  <InstallButton
+                    blocked={barmanBlocked}
+                    tooltip={
                       barmanBlocked
                         ? 'Install CloudNativePG and cert-manager first — the Barman Cloud chart needs them to issue its TLS certificates.'
                         : operatorNamespace
                         ? `Opens the official Barman Cloud plugin chart in the Headlamp App Catalog. Install it into "${operatorNamespace}" — the same namespace as the operator.`
                         : 'Opens the official Barman Cloud plugin chart in the Headlamp App Catalog.'
                     }
+                    onClick={() => openAppCatalog(CHARTS.barman)}
                   >
-                    {/* Tooltip needs a non-disabled wrapper to fire while the button is disabled. */}
-                    <span>
-                      <Button
-                        variant="outlined"
-                        fullWidth
-                        disabled={barmanBlocked}
-                        endIcon={<Icon icon="mdi:open-in-new" width={14} height={14} />}
-                        onClick={() => openAppCatalog(CHARTS.barman)}
-                      >
-                        Install via App Catalog
-                      </Button>
-                    </span>
-                  </Tooltip>
+                    Install via App Catalog
+                  </InstallButton>
                 )}
                 <LearnMoreRow docsUrl={DOC_URLS.barman} />
               </Box>
@@ -831,14 +910,15 @@ export function ComponentCards({
                     Installed
                   </Button>
                 ) : (
-                  <Button
-                    variant="outlined"
-                    disabled
-                    fullWidth
-                    endIcon={<Icon icon="mdi:open-in-new" width={14} height={14} />}
+                  // Stays disabled for everyone until the install action exists; the permission
+                  // wrapper just keeps it consistent with the other Install buttons.
+                  <InstallButton
+                    blocked
+                    tooltip="Klio installation isn't available yet."
+                    onClick={() => undefined}
                   >
                     Coming soon
-                  </Button>
+                  </InstallButton>
                 )}
                 <LearnMoreRow docsUrl={DOC_URLS.klio} />
               </Box>
