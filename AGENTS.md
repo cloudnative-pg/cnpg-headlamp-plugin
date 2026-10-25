@@ -126,7 +126,7 @@ Check out production-ready plugins in `node_modules/@kinvolk/headlamp-plugin/off
 
 ## Development Workflow
 
-> **mise only:** this repo pins its toolchain in `mise.toml` (Node 24).
+> **mise only:** this repo pins its toolchain in `mise.toml` (Node 26).
 > Run every `node` / `npm` / `npx` command via mise, e.g.
 > `mise exec -- npm run build`, `mise exec -- npx tsc --noEmit`.
 > Never invoke `node`, `npm` or `npx` directly.

@@ -35,18 +35,18 @@ mise exec -- npm start
 
 A green `tsc` / `lint` / `build` doesn't prove the plugin actually loads in Headlamp — a value imported from a path that isn't externalized at runtime resolves to `undefined` and throws on load, and a wrong `sidebar:` reference on a route fails silently instead of throwing. `scripts/cdp-verify.mjs` catches both by driving a running Headlamp over the Chrome DevTools Protocol.
 
-This requires a local clone of the [Headlamp](https://github.com/headlamp-k8s/headlamp) repo (to run Headlamp itself with the DevTools port open), in addition to this plugin's checkout. Both use `mise` and require Node 24.
+This requires a local clone of the [Headlamp](https://github.com/headlamp-k8s/headlamp) repo (to run Headlamp itself with the DevTools port open), in addition to this plugin's checkout. Both use `mise` and require Node 26.
 
 ```bash
 # in this repo
-mise exec node@24 -- npm start                      # watch build, deploys into Headlamp
+mise exec node@26 -- npm start                      # watch build, deploys into Headlamp
 
 # in the Headlamp checkout
-mise exec node@24 -- npm run install:all           # first-time setup only
-mise exec node@24 -- npm run start:with-app:debug   # backend :4466, vite :3000, Electron :9222
+mise exec node@26 -- npm run install:all           # first-time setup only
+mise exec node@26 -- npm run start:with-app:debug   # backend :4466, vite :3000, Electron :9222
 
 # back in this repo
-mise exec node@24 -- node scripts/cdp-verify.mjs [cluster-name]   # default: kind-headlamp-test, or set HEADLAMP_CLUSTER
+mise exec node@26 -- node scripts/cdp-verify.mjs [cluster-name]   # default: kind-headlamp-test, or set HEADLAMP_CLUSTER
 ```
 
 The script exits non-zero if this plugin fails to load or a route renders nothing.

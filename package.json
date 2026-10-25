@@ -2,6 +2,9 @@
   "name": "cnpg-headlamp-plugin",
   "version": "0.1.6",
   "description": "CloudNativePG Headlamp Plugin",
+  "engines": {
+    "node": ">=26"
+  },
   "scripts": {
     "start": "headlamp-plugin start",
     "build": "headlamp-plugin build",
@@ -35,11 +38,12 @@
   },
   "overrides": {
     "typescript": "5.9.3",
-    "vitest": "$vitest"
+    "vitest": "$vitest",
+    "yargs": "17.7.3"
   },
   "devDependencies": {
     "@kinvolk/headlamp-plugin": "^0.14.0",
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.0.0",
     "vitest": "5.0.5"
   },
   "dependencies": {
