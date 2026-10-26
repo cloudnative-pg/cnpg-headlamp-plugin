@@ -136,3 +136,35 @@ export function humanizePluginName(pluginId: string): string {
     .map(word => word.charAt(0).toUpperCase() + word.slice(1));
   return words.length > 0 ? words.join(' ') : pluginId;
 }
+
+/**
+ * The operator's webhook Service keeps this fixed name however the chart is renamed (it is
+ * referenced by the CRD webhook configurations), so its namespace tells us where the operator
+ * runs even when nameOverride has changed the labels we would otherwise match on.
+ */
+export const OPERATOR_WEBHOOK_SERVICE = 'cnpg-webhook-service';
+
+const OPERATOR_NAME_LABEL = 'app.kubernetes.io/name=cloudnative-pg';
+
+/**
+ * List options for finding the operator's workloads. Without a known namespace we match the
+ * chart's name label cluster-wide; with one (configured, or found via the webhook Service), we
+ * list that namespace (which may also hold plugin pods) and narrow with isOperatorWorkload.
+ */
+export function operatorListOptions(namespace: string | null): {
+  namespace?: string;
+  labelSelector?: string;
+} {
+  return namespace ? { namespace } : { labelSelector: OPERATOR_NAME_LABEL };
+}
+
+/** True for the operator's own Deployment/Pod, matched by controller image (nameOverride-proof). */
+export function isOperatorWorkload(resource: {
+  spec?: {
+    containers?: { image?: string }[];
+    template?: { spec?: { containers?: { image?: string }[] } };
+  };
+}): boolean {
+  const containers = resource.spec?.containers ?? resource.spec?.template?.spec?.containers ?? [];
+  return containers.some(c => /(^|\/)cloudnative-pg(:|@|$)/.test(c.image ?? ''));
+}

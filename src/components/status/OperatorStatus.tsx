@@ -20,7 +20,10 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   getImageVersion,
   humanizePluginName,
+  isOperatorWorkload,
   KNOWN_PLUGIN_CAPABILITIES,
+  OPERATOR_WEBHOOK_SERVICE,
+  operatorListOptions,
 } from '../../resources/status';
 import { CnpgLogo } from '../common/CnpgLogo';
 import { Pod, PodStatusLabel } from '../common/podActions';
@@ -33,12 +36,12 @@ import {
   KLIO_PLUGIN_ID,
   useCertManagerStatus,
 } from './InstallGuide';
+import { useOperatorNamespace } from './settings';
 
 type Crd = InstanceType<typeof K8s.ResourceClasses.CustomResourceDefinition>;
 type Deployment = InstanceType<typeof K8s.ResourceClasses.Deployment>;
 type Service = InstanceType<typeof K8s.ResourceClasses.Service>;
 
-const OPERATOR_LABEL = 'app.kubernetes.io/name=cloudnative-pg';
 const PLUGIN_LABEL = 'cnpg.io/pluginName';
 
 // The two API groups CNPG's own CRDs and the Barman Cloud plugin's ObjectStore CRD register
@@ -474,8 +477,8 @@ function OperatorCard({ pods, deployment }: { pods: Pod[] | null; deployment: De
           </>
         ) : (
           <StatusLabel status="error">
-            No pod matching label {OPERATOR_LABEL} was found in any namespace — the CNPG operator
-            does not appear to be installed.
+            No CNPG operator pod was found — the operator does not appear to be installed. If it
+            runs under a custom name, set its namespace in the plugin settings.
           </StatusLabel>
         )}
       </CardContent>
@@ -615,12 +618,25 @@ export function OperatorStatus() {
   const [crds] = K8s.ResourceClasses.CustomResourceDefinition.useList();
   // The operator's own pods, wherever they've been installed — no namespace filter, since the
   // roadmap explicitly calls out not hardcoding e.g. cnpg-system.
-  const [operatorPods] = K8s.ResourceClasses.Pod.useList({
-    labelSelector: OPERATOR_LABEL,
+  // The namespace comes from the setting if present, else from the operator's webhook Service
+  // (fixed name, so it survives a chart nameOverride). Only when neither exists do we fall back
+  // to the cluster-wide name-label match.
+  const operatorNamespaceSetting = useOperatorNamespace();
+  const [webhookServices] = K8s.ResourceClasses.Service.useList({
+    fieldSelector: `metadata.name=${OPERATOR_WEBHOOK_SERVICE}`,
   });
-  const [deployments] = K8s.ResourceClasses.Deployment.useList({
-    labelSelector: OPERATOR_LABEL,
-  });
+  const operatorNamespaceLookup =
+    operatorNamespaceSetting ?? webhookServices?.[0]?.getNamespace() ?? null;
+  const listOptions = operatorListOptions(operatorNamespaceLookup);
+  const [allOperatorPods] = K8s.ResourceClasses.Pod.useList(listOptions);
+  const [allDeployments] = K8s.ResourceClasses.Deployment.useList(listOptions);
+  // A known namespace lists everything in it, so narrow to the operator itself.
+  const operatorPods = operatorNamespaceLookup
+    ? allOperatorPods?.filter(pod => isOperatorWorkload(pod.jsonData)) ?? null
+    : allOperatorPods;
+  const deployments = operatorNamespaceLookup
+    ? allDeployments?.filter(d => isOperatorWorkload(d.jsonData)) ?? null
+    : allDeployments;
   const [services] = K8s.ResourceClasses.Service.useList({
     labelSelector: PLUGIN_LABEL,
   });
@@ -633,7 +649,11 @@ export function OperatorStatus() {
   }, []);
 
   const loading =
-    crds === null || operatorPods === null || deployments === null || services === null;
+    crds === null ||
+    operatorPods === null ||
+    deployments === null ||
+    services === null ||
+    webhookServices === null;
 
   const { installed: certManagerInstalled, loading: certManagerLoading } =
     useCertManagerStatus(crds);

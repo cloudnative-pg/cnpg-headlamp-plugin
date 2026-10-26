@@ -4,7 +4,9 @@ import {
   backupPhaseSeverity,
   getImageVersion,
   humanizePluginName,
+  isOperatorWorkload,
   KNOWN_PLUGIN_CAPABILITIES,
+  operatorListOptions,
   parseBool,
 } from './status';
 
@@ -115,5 +117,28 @@ describe('humanizePluginName', () => {
       'Restore',
     ]);
     expect(KNOWN_PLUGIN_CAPABILITIES['my-plugin.example.io']).toBeUndefined();
+  });
+});
+
+describe('operator detection', () => {
+  it('lists by name label cluster-wide, or by namespace when configured', () => {
+    expect(operatorListOptions(null)).toEqual({
+      labelSelector: 'app.kubernetes.io/name=cloudnative-pg',
+    });
+    expect(operatorListOptions('opns')).toEqual({ namespace: 'opns' });
+  });
+
+  it('recognizes the operator by image, for pods and deployments', () => {
+    const image = 'ghcr.io/cloudnative-pg/cloudnative-pg:1.30.1';
+    expect(isOperatorWorkload({ spec: { containers: [{ image }] } })).toBe(true);
+    expect(isOperatorWorkload({ spec: { template: { spec: { containers: [{ image }] } } } })).toBe(
+      true
+    );
+  });
+
+  it('ignores plugin and unrelated workloads', () => {
+    const other = 'ghcr.io/cloudnative-pg/plugin-barman-cloud:v0.5.0';
+    expect(isOperatorWorkload({ spec: { containers: [{ image: other }] } })).toBe(false);
+    expect(isOperatorWorkload({})).toBe(false);
   });
 });
