@@ -15,11 +15,15 @@ import { useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
 import { CnpgLogo } from '../common/CnpgLogo';
+import { useCertManagerNamespace } from './settings';
 
 const { createRouteURL } = Router;
 
 export const CERT_MANAGER_CRD = 'certificates.cert-manager.io';
 const CERT_MANAGER_LABEL = 'app.kubernetes.io/name=cert-manager';
+// Cert-manager's controller keeps this label (and its image name) even when a chart's
+// nameOverride rewrites app.kubernetes.io/name, so it is what auto-detection lists by.
+const CERT_MANAGER_CONTROLLER_LABEL = 'app.kubernetes.io/component=controller';
 
 export const BARMAN_PLUGIN_ID = 'barman-cloud.cloudnative-pg.io';
 export const KLIO_PLUGIN_ID = 'klio.cnpg.io';
@@ -84,21 +88,46 @@ export function isCertManagerInstalled(
   return crdNames.some(name => name === CERT_MANAGER_CRD) && certManagerDeployments > 0;
 }
 
+/**
+ * List options for finding cert-manager's Deployments. Without a configured namespace we list
+ * controller Deployments cluster-wide and narrow them with isCertManagerDeployment; with one,
+ * the user has told us where it lives, so any Deployment there counts.
+ */
+export function certManagerListOptions(namespace: string | null): {
+  namespace?: string;
+  labelSelector?: string;
+} {
+  return namespace ? { namespace } : { labelSelector: CERT_MANAGER_CONTROLLER_LABEL };
+}
+
+/** True for cert-manager's controller, whether or not nameOverride changed its name label. */
+export function isCertManagerDeployment(deployment: {
+  metadata?: { labels?: Record<string, string> };
+  spec?: { template?: { spec?: { containers?: { image?: string }[] } } };
+}): boolean {
+  const nameLabel = CERT_MANAGER_LABEL.split('=')[1];
+  return (
+    deployment.metadata?.labels?.['app.kubernetes.io/name'] === nameLabel ||
+    !!deployment.spec?.template?.spec?.containers?.some(c =>
+      c.image?.includes('cert-manager-controller')
+    )
+  );
+}
+
 export function useCertManagerStatus(crds: { getName(): string }[] | null): {
   installed: boolean;
   loading: boolean;
 } {
   // The official Jetstack chart labels its Deployments with app.kubernetes.io/name=cert-manager.
-  const [deployments] = K8s.ResourceClasses.Deployment.useList({
-    labelSelector: CERT_MANAGER_LABEL,
-  });
+  const namespace = useCertManagerNamespace();
+  const [deployments] = K8s.ResourceClasses.Deployment.useList(certManagerListOptions(namespace));
   if (crds === null || deployments === null) {
     return { installed: false, loading: true };
   }
   return {
     installed: isCertManagerInstalled(
       crds.map(c => c.getName()),
-      deployments.length
+      namespace ? deployments.length : deployments.filter(isCertManagerDeployment).length
     ),
     loading: false,
   };
@@ -509,6 +538,7 @@ export function ComponentCards({
   operatorNamespace: string | null;
 }) {
   const openAppCatalog = useOpenAppCatalog();
+  const certManagerNamespace = useCertManagerNamespace() ?? 'cert-manager';
   // Barman Cloud requires both the operator and cert-manager (its chart issues TLS
   // certificates), so its install action stays disabled until those are satisfied.
   const barmanBlocked = !cnpgInstalled || !certManagerInstalled;
@@ -657,14 +687,17 @@ export function ComponentCards({
                   <PrereqList
                     items={[
                       'Helm (official chart)',
-                      'Dedicated namespace (cert-manager)',
+                      `Dedicated namespace (${certManagerNamespace})`,
                       'Access to the App Catalog',
                     ]}
-                    namespace={{ name: 'cert-manager', exists: namespaceExists('cert-manager') }}
+                    namespace={{
+                      name: certManagerNamespace,
+                      exists: namespaceExists(certManagerNamespace),
+                    }}
                     createdFor={CERT_MANAGER_CREATED_FOR}
                     customNamespaces={customNamespacesFor(
                       CERT_MANAGER_CREATED_FOR,
-                      'cert-manager'
+                      certManagerNamespace
                     )}
                   />
                   <RequiredValuesNote values={'crds:\n  enabled: true'} />

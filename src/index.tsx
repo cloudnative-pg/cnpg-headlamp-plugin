@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
-import { registerRoute, registerSidebarEntry } from '@kinvolk/headlamp-plugin/lib';
+import {
+  registerPluginSettings,
+  registerRoute,
+  registerSidebarEntry,
+} from '@kinvolk/headlamp-plugin/lib';
 import { BackupDetail } from './components/backups/Detail';
 import { BackupsList } from './components/backups/List';
 import { ClusterImageCatalogDetail } from './components/clusterimagecatalogs/Detail';
@@ -40,8 +44,11 @@ import { PublicationsList } from './components/publications/List';
 import { ScheduledBackupDetail } from './components/scheduledbackups/Detail';
 import { ScheduledBackupsList } from './components/scheduledbackups/List';
 import { OperatorStatus } from './components/status/OperatorStatus';
+import { CnpgSettings } from './components/status/settings';
 import { SubscriptionDetail } from './components/subscriptions/Detail';
 import { SubscriptionsList } from './components/subscriptions/List';
+
+registerPluginSettings('cnpg-headlamp-plugin', CnpgSettings, false);
 
 // Sidebar entry "name"s share one global namespace with Headlamp's own entries and every other
 // installed plugin — the same hazard as route names below. Bare 'Clusters'/'Backups'/'Status'

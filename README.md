@@ -72,6 +72,7 @@ List and detail views for managing available Postgres operand images.
 
 - Installed CNPG CRDs and operator pod health
 - Detected CNPG-i plugins (e.g. Barman Cloud), with quick access to their logs
+- cert-manager is auto-detected in any namespace; if it uses a custom name or label, set its namespace in the plugin's settings (**Settings > Plugins > cnpg-headlamp-plugin**)
 
 ## Requirements
 
