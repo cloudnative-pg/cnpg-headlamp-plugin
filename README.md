@@ -109,14 +109,14 @@ Note: with `-in-cluster`, Headlamp authenticates with its own ServiceAccount, so
 ### Unstable testing image
 
 For development, e2e, and kind-based **pre-release testing only**, pushes to `main`
-publish `ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:main-testing` for AMD64 and ARM64.
+publish `ghcr.io/cloudnative-pg/cnpg-headlamp-plugin-testing:main` for AMD64 and ARM64.
 This moving tag is unstable, may lag behind `main` while builds complete, and is
 **not suitable for production**. It does not update release tags or `latest`.
 
 Pull the image and identify its source commit using the OCI revision label:
 
 ```sh
-IMAGE=ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:main-testing
+IMAGE=ghcr.io/cloudnative-pg/cnpg-headlamp-plugin-testing:main
 docker pull "$IMAGE"
 docker image inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'
 ```
