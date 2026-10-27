@@ -39,7 +39,7 @@
   "overrides": {
     "typescript": "5.9.3",
     "vitest": "$vitest",
-    "yargs": "17.7.3"
+    "yargs": "18.2.0"
   },
   "devDependencies": {
     "@kinvolk/headlamp-plugin": "^0.14.0",
