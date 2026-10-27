@@ -6,7 +6,6 @@
 
 A [Headlamp](https://headlamp.dev/) plugin for managing and visualizing [CloudNativePG](https://cloudnative-pg.io/) (CNPG) resources — Clusters, Poolers, Backups, Scheduled Backups, and Database objects — directly from the Headlamp UI.
 
-
 <table>
   <tr>
     <td><img src="https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/operator-status.png" alt="Operator status page" width="400"></td>
@@ -100,10 +99,50 @@ kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-
 ```
 
 <!-- x-release-please-start-version -->
+
 To install a specific [released plugin version](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases), edit the `ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:v0.1.6` image tag in the manifest.
+
 <!-- x-release-please-end -->
 
 Note: with `-in-cluster`, Headlamp authenticates with its own ServiceAccount, so grant it the RBAC permissions described in the [Headlamp in-cluster documentation](https://headlamp.dev/docs/latest/installation/in-cluster/) and generate a login token for your user (`kubectl create token <serviceaccount>`).
+
+### Unstable testing image
+
+For development, e2e, and kind-based **pre-release testing only**, pushes to `main`
+publish `ghcr.io/cloudnative-pg/cnpg-headlamp-plugin-testing:main` for AMD64 and ARM64.
+This moving tag is unstable, may lag behind `main` while builds complete, and is
+**not suitable for production**. It does not update release tags or `latest`.
+
+Pull the image and identify its source commit using the OCI revision label:
+
+```sh
+IMAGE=ghcr.io/cloudnative-pg/cnpg-headlamp-plugin-testing:main
+docker pull "$IMAGE"
+docker image inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'
+```
+
+To reproduce a test with the same build, obtain its immutable digest reference:
+
+```sh
+docker image inspect "$IMAGE" --format '{{ index .RepoDigests 0 }}'
+```
+
+Use the returned `ghcr.io/cloudnative-pg/cnpg-headlamp-plugin@sha256:…` reference
+instead of the moving tag. The publishing workflow's job summary also records
+the revision and digest.
+
+To use the testing image with the example deployment, change the image of the
+`fetch-plugins` **initContainer** to the testing reference. When using the moving
+tag, set `imagePullPolicy: Always` on that initContainer (a non-`latest` tag
+otherwise defaults to `IfNotPresent`). After a new build is published, run
+`kubectl rollout restart deployment/headlamp-with-cnpg` in your deployment's
+namespace to recreate the Pods and fetch the new plugin image. The checked-in
+example remains pinned to a release.
+
+For a kind cluster using explicitly loaded local images instead of registry pulls,
+re-run `docker pull "$IMAGE"` and `kind load docker-image "$IMAGE" --name <cluster>`
+for each new build, then restart the deployment. Use `imagePullPolicy: IfNotPresent`
+for that locally loaded image rather than `Always`, which would pull from the registry.
 
 ## Contributing
 
