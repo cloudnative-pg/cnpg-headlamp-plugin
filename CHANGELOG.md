@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.7 (2026-10-29)
+
+## What's Changed
+* chore: release v0.1.6 by @cnpg-bot in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/134
+* chore(deps-dev): bump storybook from 9.1.19 to 9.1.21 by @dependabot[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/133
+* chore(deps): update docker/login-action action to v4.7.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/138
+* chore(deps-dev): bump fast-uri from 3.1.8 to 3.1.9 by @dependabot[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/139
+* chore(deps-dev): bump undici from 7.30.0 to 7.30.1 by @dependabot[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/140
+* fix(deps): make Vitest 5 available at the project root by @gambtho in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/141
+* build!: move toolchain to node 26 and drop node 24 support by @TamaraNocentini in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/144
+* chore(deps-dev): bump qs from 6.16.0 to 6.17.0 by @dependabot[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/147
+* ci: publish main-testing plugin images by @gambtho in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/142
+* chore(deps): update dependency yargs to v18 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/146
+* chore(deps): update dependency @types/node to v26.6.6 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/148
+
+## New Contributors
+* @gambtho made their first contribution in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/141
+
+**Full Changelog**: https://github.com/cloudnative-pg/cnpg-headlamp-plugin/compare/v0.1.6...v0.1.7
+
 ## 0.1.6 (2026-10-22)
 
 ## What's Changed

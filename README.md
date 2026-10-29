@@ -100,7 +100,7 @@ kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-
 
 <!-- x-release-please-start-version -->
 
-To install a specific [released plugin version](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases), edit the `ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:v0.1.6` image tag in the manifest.
+To install a specific [released plugin version](https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases), edit the `ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:v0.1.7` image tag in the manifest.
 
 <!-- x-release-please-end -->
 
