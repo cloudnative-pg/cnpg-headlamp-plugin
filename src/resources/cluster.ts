@@ -388,6 +388,20 @@ export class Cluster extends KubeObject<CnpgCluster> {
     );
   }
 
+  /** True if this Cluster references the given Klio PluginConfiguration for backups. */
+  referencesKlioConfigAsBackup(configName: string): boolean {
+    return (this.spec.plugins ?? []).some(
+      plugin => plugin.name === 'klio.cnpg.io' && plugin.parameters?.pluginConfigurationRef === configName
+    );
+  }
+
+  /** True if this Cluster was bootstrapped via recovery from the given Klio PluginConfiguration. */
+  referencesKlioConfigAsRecoverySource(configName: string): boolean {
+    return (this.spec.externalClusters ?? []).some(
+      external => external.plugin?.parameters?.pluginConfigurationRef === configName
+    );
+  }
+
   get imageCatalogRef(): ImageCatalogRef | undefined {
     return this.spec.imageCatalogRef;
   }

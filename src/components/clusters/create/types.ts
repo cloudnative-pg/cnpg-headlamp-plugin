@@ -11,7 +11,7 @@ export type ImageSource = 'default' | 'catalog' | 'imageName';
 export type CatalogKind = 'ImageCatalog' | 'ClusterImageCatalog';
 
 export type StartOption = 'empty' | 'barman-recovery' | 'klio-recovery' | 'custom-recovery';
-export type BackupKind = 'barman' | 'custom';
+export type BackupKind = 'barman' | 'klio' | 'custom';
 export type SyncMethod = 'any' | 'first';
 export type SyncDataDurability = 'required' | 'preferred';
 
@@ -71,6 +71,8 @@ export interface ClusterCreateFormState {
   backupServerName: string;
   volumeSnapshotEnabled: boolean;
   volumeSnapshotClassName: string;
+  // Klio-plugin backups: a pluginconfigurations.klio.cnpg.io reference.
+  backupPluginConfigurationRef: string;
   backupPluginName: string;
   backupPluginParams: KVRow[];
   backupIsWalArchiver: boolean;
@@ -112,6 +114,7 @@ export function defaultFormState(): ClusterCreateFormState {
     backupServerName: '',
     volumeSnapshotEnabled: false,
     volumeSnapshotClassName: '',
+    backupPluginConfigurationRef: '',
     backupPluginName: '',
     backupPluginParams: [],
     backupIsWalArchiver: true,
@@ -277,6 +280,16 @@ export function buildClusterManifest(state: ClusterCreateFormState) {
           volumeSnapshot: { className: state.volumeSnapshotClassName },
         };
       }
+    } else if (state.backupKind === 'klio' && state.backupPluginConfigurationRef) {
+      // Klio streams WAL directly to the server — never set isWALArchiver for it.
+      spec.plugins = [
+        {
+          name: KLIO_PLUGIN_NAME,
+          parameters: {
+            pluginConfigurationRef: state.backupPluginConfigurationRef,
+          },
+        },
+      ];
     } else if (state.backupKind === 'custom' && state.backupPluginName.trim()) {
       spec.plugins = [
         {
@@ -383,6 +396,10 @@ export function deriveSummary(state: ClusterCreateFormState): ClusterSummary {
     backup =
       state.backupKind === 'barman'
         ? `Enabled (barman${state.volumeSnapshotEnabled ? ' + snapshots' : ''})`
+        : state.backupKind === 'klio'
+        ? `Enabled (klio${
+            state.backupPluginConfigurationRef ? `: ${state.backupPluginConfigurationRef}` : ''
+          })`
         : `Enabled (custom${
             state.backupPluginName.trim() ? `: ${state.backupPluginName.trim()}` : ''
           })`;
@@ -465,6 +482,9 @@ export function getValidationErrors(state: ClusterCreateFormState): string[] {
   }
   if (state.backupEnabled && state.backupKind === 'barman' && !state.backupObjectStoreName) {
     errors.push('Backup ObjectStore is required when Barman backups are enabled.');
+  }
+  if (state.backupEnabled && state.backupKind === 'klio' && !state.backupPluginConfigurationRef) {
+    errors.push('Plugin configuration is required when Klio backups are enabled.');
   }
   if (state.backupEnabled && state.backupKind === 'custom' && !state.backupPluginName.trim()) {
     errors.push('Plugin name is required when custom backups are enabled.');
