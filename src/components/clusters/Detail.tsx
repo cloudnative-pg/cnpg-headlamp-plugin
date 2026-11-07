@@ -74,6 +74,7 @@ import {
 import { launchConnectActivity } from './connect';
 import { FenceAction } from './fence';
 import { HibernateDetailAction } from './hibernate';
+import { ScaleAction } from './scale';
 import { SwitchoverAction } from './switchover';
 
 const { createRouteURL } = Router;
@@ -2009,6 +2010,7 @@ function ClusterHeaderActions({ cluster }: { cluster: Cluster }) {
       />
       <EditButton item={cluster} />
       <DeleteButton item={cluster} />
+      <ScaleAction cluster={cluster} />
       <HibernateDetailAction cluster={cluster} />
     </Box>
   );

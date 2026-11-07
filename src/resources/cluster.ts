@@ -222,6 +222,11 @@ export class Cluster extends KubeObject<CnpgCluster> {
     } as any);
   }
 
+  /** Scales the cluster by patching `spec.instances`, like `kubectl cnpg` / `kubectl scale`. */
+  setInstances(instances: number): Promise<any> {
+    return this.patch({ spec: { instances } } as any);
+  }
+
   /**
    * Instance names listed in the `cnpg.io/fencedInstances` annotation (`*` means all), or
    * `undefined` when the annotation holds a value the operator itself would reject.

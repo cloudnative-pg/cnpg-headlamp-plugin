@@ -36,6 +36,7 @@ List and detail views, plus a guided creation form.
   - **General Health** and **Checkpointing** (switchable per instance via a dropdown): connections, cache hit ratio, database size, blocked and long running queries, deadlocks, checkpoint and restartpoint counts
   - **Database Health**: transaction ID and multixact age, rollback ratio, temp file spill, and extension updates, per database
   - A status strip flags fencing, a pending manual switchover, or available extension updates when applicable. Tiles show an (i) icon with a short description and the underlying `cnpg_*` metric name(s), with an optional automatic refresh interval (15s/30s/60s or off, matched to the exporter's own 30 second refresh cadence)
+- A **scale** action on the cluster detail page to change the number of instances (`spec.instances`) from a free number input, with a warning when dropping below 2 instances
 - A manual **switchover** action to promote a chosen replica to primary
 - **Fencing** support (mirroring `kubectl cnpg fencing on|off`): fence or unfence individual instances from the cluster's instance list, with an extra warning when fencing the primary
 - **Hibernation** support (mirroring `kubectl cnpg hibernate on|off`): hibernate a running cluster from its detail page or the cluster list to delete its instance pods while retaining storage, see hibernated clusters clearly marked (with their own summary count) in the list, and rehydrate them from the list
