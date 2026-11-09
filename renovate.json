@@ -2,7 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", ":semanticCommitType(chore)", ":gitSignOff"],
   "semanticCommits": "enabled",
-  "enabledManagers": ["custom.regex", "npm", "github-actions"],
+  "enabledManagers": ["custom.regex", "npm", "github-actions", "mise"],
   "customManagers": [
     {
       "customType": "regex",
