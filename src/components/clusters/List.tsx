@@ -62,8 +62,8 @@ function RestoreMenu() {
 // │  8 Clusters     7 Healthy     1 Needs attention     24 Instances       │
 // └─────────────────────────────────────────────────────────────────────────┘
 //
-// "Needs attention" is anything not fully healthy (Degraded + Unhealthy) — the per-row
-// Status column below keeps the finer-grained label. Instance count is the desired
+// "Needs attention" is any non-hibernated cluster that is Unhealthy or carries a warning
+// (failing backup / WAL archiving) — the per-row Status column below shows the details. Instance count is the desired
 // spec.instances total, matching `kubectl get clusters` rather than live pod counts.
 function ClusterSummaryBar() {
   // Global counts (all namespaces) — the table below may additionally be narrowed by
@@ -73,7 +73,9 @@ function ClusterSummaryBar() {
   const total = clusters?.length ?? 0;
   const healthy = (clusters ?? []).filter(c => c.health === 'success').length;
   const hibernated = (clusters ?? []).filter(c => c.isHibernated).length;
-  const needsAttention = total - healthy - hibernated;
+  const needsAttention = (clusters ?? []).filter(
+    c => !c.isHibernated && (c.health !== 'success' || c.warnings.length > 0)
+  ).length;
   const instances = (clusters ?? []).reduce((sum, c) => sum + c.instances, 0);
 
   const stats: { value: number; label: string; highlight?: boolean }[] = [
@@ -146,7 +148,14 @@ const clusterColumns: (ResourceTableColumn<Cluster> | ColumnType)[] = [
           </span>
         </Tooltip>
       ) : (
-        <StatusLabel status={item.health}>{item.healthLabel}</StatusLabel>
+        <Box display="flex" flexDirection="column" alignItems="flex-start" gap={0.5}>
+          <StatusLabel status={item.health}>{item.healthLabel}</StatusLabel>
+          {item.warnings.map(warning => (
+            <StatusLabel key={warning.message} status={warning.severity}>
+              {warning.message}
+            </StatusLabel>
+          ))}
+        </Box>
       ),
   },
   {

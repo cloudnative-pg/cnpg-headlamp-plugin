@@ -393,11 +393,28 @@ function SummaryStrip({ cluster }: { cluster: Cluster }) {
           icon={<Icon icon="mdi:hexagon-multiple-outline" width={18} height={18} />}
           title="Health"
           value={
-            <HealthStatusIcon
-              healthy={cluster.health === 'success'}
-              size={22}
-              title={cluster.healthLabel}
-            />
+            <Box display="flex" alignItems="center" gap={1}>
+              <HealthStatusIcon
+                healthy={cluster.health === 'success'}
+                size={22}
+                title={cluster.healthLabel}
+              />
+              {cluster.warnings.length > 0 && (
+                <Tooltip title={cluster.warnings.map(w => w.message).join(' · ')}>
+                  <Box
+                    component="span"
+                    sx={{
+                      display: 'inline-flex',
+                      color: cluster.warnings.some(w => w.severity === 'error')
+                        ? 'error.main'
+                        : 'warning.main',
+                    }}
+                  >
+                    <Icon icon="mdi:alert-outline" width={20} height={20} />
+                  </Box>
+                </Tooltip>
+              )}
+            </Box>
           }
         />
       </Grid>
@@ -879,7 +896,8 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
     cluster.spec.backup?.volumeSnapshot?.className ??
     '-';
 
-  const healthy = cluster.isLastBackupSucceeded !== false;
+  const backupHealthy = cluster.isLastBackupSucceeded !== false && cluster.isArchivingWal !== false;
+  const runningBackup = clusterBackups.find(b => b.phase === 'running' || b.phase === 'started');
 
   return (
     <SectionBox
@@ -890,9 +908,13 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
             <>
               <Box component="span" sx={{ display: 'inline-flex', verticalAlign: 'middle', mr: 1 }}>
                 <HealthStatusIcon
-                  healthy={cluster.health === 'success'}
+                  healthy={backupHealthy}
                   size={20}
-                  title={cluster.healthLabel}
+                  title={
+                    backupHealthy
+                      ? 'Backups and WAL archiving OK'
+                      : cluster.warnings.map(w => w.message).join(' · ')
+                  }
                 />
               </Box>
               Backup Status
@@ -903,6 +925,28 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
     >
       <InfoTable
         rows={[
+          {
+            name: 'Last backup result',
+            value:
+              cluster.isLastBackupSucceeded === undefined
+                ? 'No backup reported yet'
+                : cluster.isLastBackupSucceeded
+                ? 'Succeeded'
+                : 'Failed',
+          },
+          {
+            name: 'Backup in progress',
+            value: runningBackup ? `${runningBackup.getName()} (${runningBackup.phase})` : 'No',
+          },
+          {
+            name: 'WAL archiving',
+            value:
+              cluster.isArchivingWal === undefined
+                ? 'Not reported'
+                : cluster.isArchivingWal
+                ? 'Working'
+                : 'Failing',
+          },
           {
             name: 'Last successful backup',
             value: lastSuccessful?.stoppedAt ? localeDate(lastSuccessful.stoppedAt) : 'None yet',
@@ -916,9 +960,13 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
           { name: 'Backup location', value: backupLocation },
         ]}
       />
-      {!healthy && (
-        <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 1 }}>
-          Last backup did not succeed — check the Backups tab.
+      {cluster.warnings.length > 0 && (
+        <Typography
+          variant="caption"
+          color={cluster.warnings.some(w => w.severity === 'error') ? 'error.main' : 'warning.main'}
+          sx={{ display: 'block', mt: 1 }}
+        >
+          {cluster.warnings.map(w => w.message).join(' · ')} — check the Backups tab.
         </Typography>
       )}
       <Box sx={{ mt: 2 }}>

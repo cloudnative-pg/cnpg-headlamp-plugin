@@ -139,6 +139,12 @@ const CONDITION_LAST_BACKUP_SUCCEEDED = 'LastBackupSucceeded';
 
 export type ClusterHealth = 'success' | 'warning' | 'error';
 
+export interface ClusterWarning {
+  message: string;
+  /** error (red) for problems that can escalate, e.g. WAL piling up; warning (yellow) otherwise. */
+  severity: 'warning' | 'error';
+}
+
 export class Cluster extends KubeObject<CnpgCluster> {
   static kind = 'Cluster';
   static apiName = 'clusters';
@@ -338,11 +344,12 @@ export class Cluster extends KubeObject<CnpgCluster> {
   }
 
   /**
-   * Traffic-light health for the cluster:
+   * Traffic-light health for the cluster, based on the cluster phase only:
    * - error (red): the cluster phase itself is unhealthy.
-   * - warning (yellow): phase is healthy, but WAL archiving and/or the last backup aren't confirmed good.
-   * - success (green): phase is healthy, WAL archiving is working, and the last backup succeeded
-   *   (or no backup has been configured/taken yet, in which case it isn't held against the cluster).
+   * - success (green): the phase is healthy.
+   *
+   * Backup and WAL-archiving problems do NOT change this — a failing backup doesn't mean the
+   * database is unhealthy. They are reported separately via `warnings`.
    *
    * A hibernated cluster has no status to judge, so it reports warning — never success (it isn't
    * running) and never error (nothing is actually wrong). Its label reads 'Hibernated' instead.
@@ -351,27 +358,34 @@ export class Cluster extends KubeObject<CnpgCluster> {
     if (this.isHibernated) {
       return 'warning';
     }
-    if (!this.isPhaseHealthy) {
-      return 'error';
-    }
-    if (this.isArchivingWal === false || this.isLastBackupSucceeded === false) {
-      return 'warning';
-    }
-    return 'success';
+    return this.isPhaseHealthy ? 'success' : 'error';
   }
 
   get healthLabel(): string {
     if (this.isHibernated) {
       return 'Hibernated';
     }
-    switch (this.health) {
-      case 'success':
-        return 'Healthy';
-      case 'warning':
-        return 'Degraded';
-      default:
-        return 'Unhealthy';
+    return this.health === 'success' ? 'Healthy' : 'Unhealthy';
+  }
+
+  /**
+   * Short, human-readable warnings that don't affect `health` but deserve attention:
+   * WAL archiving failing and the last backup not having succeeded. Empty when hibernated
+   * (there is no status to judge).
+   */
+  get warnings(): ClusterWarning[] {
+    if (this.isHibernated) {
+      return [];
     }
+    const warnings: ClusterWarning[] = [];
+    if (this.isArchivingWal === false) {
+      // Red: unarchived WAL accumulates on the primary's disk and can eventually fill it.
+      warnings.push({ message: 'WAL archiving failing', severity: 'error' });
+    }
+    if (this.isLastBackupSucceeded === false) {
+      warnings.push({ message: 'Last backup failed', severity: 'warning' });
+    }
+    return warnings;
   }
 
   /** The VolumeSnapshotClass configured for volume-snapshot backups, if any. */
