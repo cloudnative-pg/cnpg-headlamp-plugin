@@ -4,6 +4,7 @@ import {
   backupPhaseSeverity,
   getImageVersion,
   humanizePluginName,
+  isBackupInProgress,
   KNOWN_PLUGIN_CAPABILITIES,
   parseBool,
 } from './status';
@@ -116,4 +117,17 @@ describe('humanizePluginName', () => {
     ]);
     expect(KNOWN_PLUGIN_CAPABILITIES['my-plugin.example.io']).toBeUndefined();
   });
+});
+
+describe('isBackupInProgress', () => {
+  it.each(['pending', 'started', 'running', 'finalizing'])('%s is in progress', phase => {
+    expect(isBackupInProgress(phase)).toBe(true);
+  });
+
+  it.each(['completed', 'failed', 'walArchivingFailing', 'something else', undefined])(
+    '%s is not',
+    phase => {
+      expect(isBackupInProgress(phase)).toBe(false);
+    }
+  );
 });

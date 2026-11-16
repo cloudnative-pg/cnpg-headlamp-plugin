@@ -37,10 +37,11 @@ import Typography from '@mui/material/Typography';
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { Redirect, useHistory, useParams } from 'react-router-dom';
 import { Backup } from '../../resources/backup';
-import { Cluster } from '../../resources/cluster';
+import { Cluster, ClusterWarning } from '../../resources/cluster';
 import { FailoverQuorum } from '../../resources/failoverQuorum';
 import { Pooler } from '../../resources/pooler';
 import { ScheduledBackup } from '../../resources/scheduledbackup';
+import { isBackupInProgress } from '../../resources/status';
 import { launchBackupCreate } from '../backups/Create';
 import { BackupPhaseLabel } from '../backups/List';
 import { CnpgLogo } from '../common/CnpgLogo';
@@ -76,6 +77,8 @@ import { FenceAction } from './fence';
 import { HibernateDetailAction } from './hibernate';
 import { ScaleAction } from './scale';
 import { SwitchoverAction } from './switchover';
+import { warningsColor, warningsSummary } from './useClusterWarnings';
+import { WalArchivingAlert } from './WalArchivingAlert';
 
 const { createRouteURL } = Router;
 
@@ -355,7 +358,7 @@ function HealthStatusIcon({
   );
 }
 
-function SummaryStrip({ cluster }: { cluster: Cluster }) {
+function SummaryStrip({ cluster, warnings }: { cluster: Cluster; warnings: ClusterWarning[] }) {
   const [pvcs] = K8s.ResourceClasses.PersistentVolumeClaim.useList({
     namespace: cluster.getNamespace(),
     labelSelector: `cnpg.io/cluster=${cluster.getName()}`,
@@ -399,15 +402,13 @@ function SummaryStrip({ cluster }: { cluster: Cluster }) {
                 size={22}
                 title={cluster.healthLabel}
               />
-              {cluster.warnings.length > 0 && (
-                <Tooltip title={cluster.warnings.map(w => w.message).join(' · ')}>
+              {warnings.length > 0 && (
+                <Tooltip title={warningsSummary(warnings)}>
                   <Box
                     component="span"
                     sx={{
                       display: 'inline-flex',
-                      color: cluster.warnings.some(w => w.severity === 'error')
-                        ? 'error.main'
-                        : 'warning.main',
+                      color: warningsColor(warnings),
                     }}
                   >
                     <Icon icon="mdi:alert-outline" width={20} height={20} />
@@ -867,6 +868,7 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
   const history = useHistory();
   const [backups] = Backup.useList({ namespace: cluster.getNamespace() });
   const [scheduled] = ScheduledBackup.useList({ namespace: cluster.getNamespace() });
+  const warnings = cluster.getWarnings(backups);
 
   const clusterBackups = useMemo(
     () => (backups ?? []).filter(b => b.clusterName === cluster.getName()),
@@ -896,8 +898,8 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
     cluster.spec.backup?.volumeSnapshot?.className ??
     '-';
 
-  const backupHealthy = cluster.isLastBackupSucceeded !== false && cluster.isArchivingWal !== false;
-  const runningBackup = clusterBackups.find(b => b.phase === 'running' || b.phase === 'started');
+  const backupHealthy = warnings.length === 0;
+  const runningBackup = clusterBackups.find(b => isBackupInProgress(b.phase));
 
   return (
     <SectionBox
@@ -910,11 +912,7 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
                 <HealthStatusIcon
                   healthy={backupHealthy}
                   size={20}
-                  title={
-                    backupHealthy
-                      ? 'Backups and WAL archiving OK'
-                      : cluster.warnings.map(w => w.message).join(' · ')
-                  }
+                  title={backupHealthy ? 'Backups and WAL archiving OK' : warningsSummary(warnings)}
                 />
               </Box>
               Backup Status
@@ -927,12 +925,13 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
         rows={[
           {
             name: 'Last backup result',
-            value:
-              cluster.isLastBackupSucceeded === undefined
-                ? 'No backup reported yet'
-                : cluster.isLastBackupSucceeded
-                ? 'Succeeded'
-                : 'Failed',
+            value: runningBackup
+              ? 'In progress'
+              : cluster.isLastBackupSucceeded === undefined
+              ? 'No backup reported yet'
+              : cluster.isLastBackupSucceeded
+              ? 'Succeeded'
+              : 'Failed',
           },
           {
             name: 'Backup in progress',
@@ -960,13 +959,13 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
           { name: 'Backup location', value: backupLocation },
         ]}
       />
-      {cluster.warnings.length > 0 && (
+      {warnings.length > 0 && (
         <Typography
           variant="caption"
-          color={cluster.warnings.some(w => w.severity === 'error') ? 'error.main' : 'warning.main'}
+          color={warningsColor(warnings)}
           sx={{ display: 'block', mt: 1 }}
         >
-          {cluster.warnings.map(w => w.message).join(' · ')} — check the Backups tab.
+          {warningsSummary(warnings)} — check the Backups tab.
         </Typography>
       )}
       <Box sx={{ mt: 2 }}>
@@ -2075,6 +2074,7 @@ export function ClusterDetail() {
   const [lease] = K8s.ResourceClasses.Lease.useGet(name, namespace, {
     cluster: selectedCluster ?? undefined,
   });
+  const [backups] = Backup.useList({ namespace });
 
   if (clusterError) {
     return (
@@ -2102,6 +2102,11 @@ export function ClusterDetail() {
   }
 
   const created = cluster.jsonData.metadata?.creationTimestamp;
+  const warnings = cluster.getWarnings(backups);
+  // While a new backup is in flight the previous result is stale, so the Backups tab shows no
+  // pass/fail icon until it finishes (the same rule that holds back "Last backup failed").
+  const showBackupResult =
+    cluster.isLastBackupSucceeded !== undefined && !cluster.hasBackupInProgress(backups);
 
   return (
     <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -2139,7 +2144,9 @@ export function ClusterDetail() {
         <ClusterHeaderActions cluster={cluster} />
       </Box>
 
-      <SummaryStrip cluster={cluster} />
+      <WalArchivingAlert warnings={warnings} />
+
+      <SummaryStrip cluster={cluster} warnings={warnings} />
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value)} variant="scrollable">
@@ -2149,9 +2156,9 @@ export function ClusterDetail() {
           <Tab
             label={
               <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-                {cluster.isLastBackupSucceeded !== undefined && (
+                {showBackupResult && (
                   <HealthStatusIcon
-                    healthy={cluster.isLastBackupSucceeded}
+                    healthy={!!cluster.isLastBackupSucceeded}
                     size={16}
                     title={
                       cluster.isLastBackupSucceeded

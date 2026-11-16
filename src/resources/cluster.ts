@@ -1,4 +1,13 @@
 import { KubeObject, KubeObjectInterface } from '@kinvolk/headlamp-plugin/lib/k8s/cluster';
+import type { Backup } from './backup';
+import {
+  type ClusterWarning,
+  computeClusterWarnings,
+  CONDITION_CONTINUOUS_ARCHIVING,
+  CONDITION_LAST_BACKUP_SUCCEEDED,
+  conditionState,
+  hasBackupInProgressFor,
+} from './clusterWarnings';
 import {
   FENCE_ALL_INSTANCES,
   FENCED_INSTANCES_ANNOTATION,
@@ -134,16 +143,9 @@ const HIBERNATION_ON = 'on';
 /** Type of the status condition the operator sets to report hibernation state. */
 export const HIBERNATION_CONDITION_TYPE = 'cnpg.io/hibernation';
 
-const CONDITION_CONTINUOUS_ARCHIVING = 'ContinuousArchiving';
-const CONDITION_LAST_BACKUP_SUCCEEDED = 'LastBackupSucceeded';
-
 export type ClusterHealth = 'success' | 'warning' | 'error';
 
-export interface ClusterWarning {
-  message: string;
-  /** error (red) for problems that can escalate, e.g. WAL piling up; warning (yellow) otherwise. */
-  severity: 'warning' | 'error';
-}
+export type { ClusterWarning };
 
 export class Cluster extends KubeObject<CnpgCluster> {
   static kind = 'Cluster';
@@ -278,14 +280,16 @@ export class Cluster extends KubeObject<CnpgCluster> {
   }
 
   get isArchivingWal(): boolean | undefined {
-    const condition = this.getCondition(CONDITION_CONTINUOUS_ARCHIVING);
-    return condition ? condition.status === 'True' : undefined;
+    return conditionState(this.status.conditions, CONDITION_CONTINUOUS_ARCHIVING);
   }
 
-  /** True/false if CNPG has reported on the last backup, undefined if no backup has run yet. */
+  /**
+   * True/false if CNPG has reported the outcome of the last backup; undefined if no backup has
+   * run yet or its outcome is still unknown (condition status 'Unknown', e.g. a backup that has
+   * just started) — an in-flight backup must not be reported as a failure.
+   */
   get isLastBackupSucceeded(): boolean | undefined {
-    const condition = this.getCondition(CONDITION_LAST_BACKUP_SUCCEEDED);
-    return condition ? condition.status === 'True' : undefined;
+    return conditionState(this.status.conditions, CONDITION_LAST_BACKUP_SUCCEEDED);
   }
 
   get currentPrimary(): string | undefined {
@@ -349,7 +353,7 @@ export class Cluster extends KubeObject<CnpgCluster> {
    * - success (green): the phase is healthy.
    *
    * Backup and WAL-archiving problems do NOT change this — a failing backup doesn't mean the
-   * database is unhealthy. They are reported separately via `warnings`.
+   * database is unhealthy. They are reported separately via `getWarnings`.
    *
    * A hibernated cluster has no status to judge, so it reports warning — never success (it isn't
    * running) and never error (nothing is actually wrong). Its label reads 'Hibernated' instead.
@@ -368,24 +372,17 @@ export class Cluster extends KubeObject<CnpgCluster> {
     return this.health === 'success' ? 'Healthy' : 'Unhealthy';
   }
 
-  /**
-   * Short, human-readable warnings that don't affect `health` but deserve attention:
-   * WAL archiving failing and the last backup not having succeeded. Empty when hibernated
-   * (there is no status to judge).
-   */
-  get warnings(): ClusterWarning[] {
-    if (this.isHibernated) {
-      return [];
-    }
-    const warnings: ClusterWarning[] = [];
-    if (this.isArchivingWal === false) {
-      // Red: unarchived WAL accumulates on the primary's disk and can eventually fill it.
-      warnings.push({ message: 'WAL archiving failing', severity: 'error' });
-    }
-    if (this.isLastBackupSucceeded === false) {
-      warnings.push({ message: 'Last backup failed', severity: 'warning' });
-    }
-    return warnings;
+  /** True if one of the given Backups of this Cluster is still in flight. */
+  hasBackupInProgress(backups: Backup[] | null | undefined): boolean {
+    return hasBackupInProgressFor(this.getName(), this.getNamespace(), backups);
+  }
+
+  /** See `computeClusterWarnings`. */
+  getWarnings(backups: Backup[] | null | undefined): ClusterWarning[] {
+    return computeClusterWarnings(this.status.conditions, {
+      hibernated: this.isHibernated,
+      backupInProgress: this.hasBackupInProgress(backups),
+    });
   }
 
   /** The VolumeSnapshotClass configured for volume-snapshot backups, if any. */

@@ -60,6 +60,11 @@ export function backupPhaseSeverity(phase: string | undefined): StatusSeverity {
   }
 }
 
+/** True while a Backup is still in flight (not yet completed or failed). */
+export function isBackupInProgress(phase: string | undefined): boolean {
+  return ['pending', 'started', 'running', 'finalizing'].includes(phase ?? '');
+}
+
 /**
  * The declarative CRDs (Database, DatabaseRole, Publication, Subscription) all report progress the
  * same way: a tri-state `status.applied` plus a `status.message` explaining a failure.

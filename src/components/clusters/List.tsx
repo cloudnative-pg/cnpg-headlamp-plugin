@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react';
 import {
   ColumnType,
   Link,
@@ -14,10 +15,13 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useState } from 'react';
 import { useHistory } from 'react-router-dom';
+import { Backup } from '../../resources/backup';
 import { Cluster } from '../../resources/cluster';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
+import { formatElapsedSince } from '../common/formatElapsed';
 import { getClusterCreateUrl } from './create/CreatePage';
 import { HibernateListAction } from './hibernate';
+import { useClusterWarnings } from './useClusterWarnings';
 
 // "Restore" lands on the same guided page as "Create Cluster", just pre-switched to the
 // recovery start option (restore from an object store) via ?start=recovery.
@@ -69,12 +73,13 @@ function ClusterSummaryBar() {
   // Global counts (all namespaces) — the table below may additionally be narrowed by
   // Headlamp's namespace filter, which lives in redux and doesn't affect this hook.
   const [clusters] = Cluster.useList();
+  const [backups] = Backup.useList();
 
   const total = clusters?.length ?? 0;
   const healthy = (clusters ?? []).filter(c => c.health === 'success').length;
   const hibernated = (clusters ?? []).filter(c => c.isHibernated).length;
   const needsAttention = (clusters ?? []).filter(
-    c => !c.isHibernated && (c.health !== 'success' || c.warnings.length > 0)
+    c => !c.isHibernated && (c.health !== 'success' || c.getWarnings(backups).length > 0)
   ).length;
   const instances = (clusters ?? []).reduce((sum, c) => sum + c.instances, 0);
 
@@ -119,6 +124,35 @@ function ClusterSummaryBar() {
   );
 }
 
+function ClusterWarningLabels({ cluster }: { cluster: Cluster }) {
+  const warnings = useClusterWarnings(cluster);
+  return (
+    <>
+      {warnings.map(warning => {
+        const failingFor = formatElapsedSince(warning.since);
+        return (
+          <Tooltip key={warning.id} title={warning.details ?? ''}>
+            <span>
+              <StatusLabel status={warning.severity}>
+                {warning.severity === 'error' && (
+                  <Icon
+                    icon="mdi:alert-circle"
+                    width={14}
+                    height={14}
+                    style={{ verticalAlign: 'text-bottom', marginRight: 4 }}
+                  />
+                )}
+                {warning.message}
+                {failingFor ? ` · ${failingFor}` : ''}
+              </StatusLabel>
+            </span>
+          </Tooltip>
+        );
+      })}
+    </>
+  );
+}
+
 const clusterColumns: (ResourceTableColumn<Cluster> | ColumnType)[] = [
   {
     id: 'cluster',
@@ -150,11 +184,7 @@ const clusterColumns: (ResourceTableColumn<Cluster> | ColumnType)[] = [
       ) : (
         <Box display="flex" flexDirection="column" alignItems="flex-start" gap={0.5}>
           <StatusLabel status={item.health}>{item.healthLabel}</StatusLabel>
-          {item.warnings.map(warning => (
-            <StatusLabel key={warning.message} status={warning.severity}>
-              {warning.message}
-            </StatusLabel>
-          ))}
+          <ClusterWarningLabels cluster={item} />
         </Box>
       ),
   },

@@ -27,7 +27,7 @@ A [Headlamp](https://headlamp.dev/) plugin for managing and visualizing [CloudNa
 
 List and detail views, plus a guided creation form.
 
-- Health indicator based on the cluster phase, with separate warning labels (WAL archiving failing, last backup failed) and a Backup Status card showing last result, in-progress backup and WAL archiving state
+- Health indicator based on the cluster phase, with separate warnings for failing WAL archiving (red, with a banner on the detail page and how long it has been failing) and a failed last backup (held back while a new backup is running), plus a Backup Status card showing last result, in-progress backup and WAL archiving state
 - Instance roles and synchronous replication warnings
 - Per-instance Postgres logs (filterable, color-coded, live-following)
 - A `psql` terminal against the primary or any replica
