@@ -31,6 +31,12 @@ import { DatabaseDetail } from './components/databases/Detail';
 import { DatabasesList } from './components/databases/List';
 import { ImageCatalogDetail } from './components/imagecatalogs/Detail';
 import { ImageCatalogsList } from './components/imagecatalogs/List';
+import { CreateKlioConfigPage } from './components/klioconfigs/create/CreatePage';
+import { KlioConfigDetail } from './components/klioconfigs/Detail';
+import { KlioConfigsList } from './components/klioconfigs/List';
+import { CreateKlioServerPage } from './components/klioservers/create/CreatePage';
+import { KlioServerDetail } from './components/klioservers/Detail';
+import { KlioServersList } from './components/klioservers/List';
 import { ObjectStoreDetail } from './components/objectstores/Detail';
 import { ObjectStoresList } from './components/objectstores/List';
 import { PoolerDetail } from './components/poolers/Detail';
@@ -146,8 +152,40 @@ registerSidebarEntry({
 registerSidebarEntry({
   name: 'cnpg-object-stores',
   url: '/cnpg/objectstores',
-  parent: 'cnpg-backups-group',
+  parent: 'cnpg-barman-group',
   label: 'Object Stores',
+});
+
+registerSidebarEntry({
+  name: 'cnpg-barman-group',
+  // Same explicit-url workaround as the other groups: without it this group link would
+  // resolve to nothing and never expand.
+  url: '/cnpg/objectstores',
+  parent: 'cnpg-root',
+  label: 'Barman Cloud',
+});
+
+registerSidebarEntry({
+  name: 'cnpg-klio-group',
+  // Same explicit-url workaround as the other groups: without it this group link would
+  // resolve to nothing and never expand.
+  url: '/cnpg/klioservers',
+  parent: 'cnpg-root',
+  label: 'Klio',
+});
+
+registerSidebarEntry({
+  name: 'cnpg-klio-servers',
+  url: '/cnpg/klioservers',
+  parent: 'cnpg-klio-group',
+  label: 'Servers',
+});
+
+registerSidebarEntry({
+  name: 'cnpg-klio-configs',
+  url: '/cnpg/klioconfigs',
+  parent: 'cnpg-klio-group',
+  label: 'Client Configs',
 });
 
 registerSidebarEntry({
@@ -307,6 +345,54 @@ registerRoute({
   name: 'CNPG Scheduled Backup',
   exact: true,
   component: () => <ScheduledBackupDetail />,
+});
+
+registerRoute({
+  path: '/cnpg/klioservers',
+  sidebar: 'cnpg-klio-servers',
+  name: 'CNPG Klio Servers',
+  exact: true,
+  component: () => <KlioServersList />,
+});
+
+registerRoute({
+  path: '/cnpg/klioservers/new',
+  sidebar: 'cnpg-klio-servers',
+  name: 'CNPG Klio Server New',
+  exact: true,
+  component: () => <CreateKlioServerPage />,
+});
+
+registerRoute({
+  path: '/cnpg/klioservers/:namespace/:name',
+  sidebar: 'cnpg-klio-servers',
+  name: 'CNPG Klio Server',
+  exact: true,
+  component: () => <KlioServerDetail />,
+});
+
+registerRoute({
+  path: '/cnpg/klioconfigs',
+  sidebar: 'cnpg-klio-configs',
+  name: 'CNPG Klio Configs',
+  exact: true,
+  component: () => <KlioConfigsList />,
+});
+
+registerRoute({
+  path: '/cnpg/klioconfigs/new',
+  sidebar: 'cnpg-klio-configs',
+  name: 'CNPG Klio Config New',
+  exact: true,
+  component: () => <CreateKlioConfigPage />,
+});
+
+registerRoute({
+  path: '/cnpg/klioconfigs/:namespace/:name',
+  sidebar: 'cnpg-klio-configs',
+  name: 'CNPG Klio Config',
+  exact: true,
+  component: () => <KlioConfigDetail />,
 });
 
 registerRoute({
