@@ -35,6 +35,7 @@ export interface WarningCondition {
 
 interface BackupLike {
   phase?: string;
+  stoppedAt?: string;
   clusterName: string;
   getNamespace(): string;
 }
@@ -61,15 +62,47 @@ export function hasBackupInProgressFor(
   );
 }
 
+/** When the most recent completed Backup of the given cluster finished, if any. */
+export function lastCompletedBackupAt(
+  clusterName: string,
+  namespace: string,
+  backups: BackupLike[] | null | undefined
+): string | undefined {
+  return (backups ?? [])
+    .filter(
+      backup =>
+        backup.phase === 'completed' &&
+        backup.stoppedAt &&
+        backup.clusterName === clusterName &&
+        backup.getNamespace() === namespace
+    )
+    .map(backup => backup.stoppedAt as string)
+    .sort()
+    .pop();
+}
+
+/** True if `completedAt` is at or after `since` (both RFC 3339); false if either is missing. */
+function isCompletedSince(completedAt: string | undefined, since: string | undefined): boolean {
+  const completed = completedAt ? Date.parse(completedAt) : NaN;
+  const failed = since ? Date.parse(since) : NaN;
+  return !Number.isNaN(completed) && !Number.isNaN(failed) && completed >= failed;
+}
+
 /**
  * Warnings that don't affect cluster health but deserve attention: WAL archiving failing (red)
  * and the last backup not having succeeded (yellow). Empty when hibernated (no status to judge).
  * While a backup is in flight, "Last backup failed" is omitted — that failure belongs to the
- * previous backup, and a new one is already running.
+ * previous backup, and a new one is already running. The same goes for a backup that has already
+ * completed after the condition turned False: the operator updates the cluster condition a moment
+ * after the Backup reaches `completed`, and until then the condition is stale.
  */
 export function computeClusterWarnings(
   conditions: WarningCondition[] | undefined,
-  { hibernated, backupInProgress }: { hibernated: boolean; backupInProgress: boolean }
+  {
+    hibernated,
+    backupInProgress,
+    lastCompletedBackupAt,
+  }: { hibernated: boolean; backupInProgress: boolean; lastCompletedBackupAt?: string }
 ): ClusterWarning[] {
   if (hibernated) {
     return [];
@@ -86,7 +119,12 @@ export function computeClusterWarnings(
       conditionMessage: condition?.message,
     });
   }
-  if (conditionState(conditions, CONDITION_LAST_BACKUP_SUCCEEDED) === false && !backupInProgress) {
+  const lastBackupCondition = conditions?.find(c => c.type === CONDITION_LAST_BACKUP_SUCCEEDED);
+  if (
+    conditionState(conditions, CONDITION_LAST_BACKUP_SUCCEEDED) === false &&
+    !backupInProgress &&
+    !isCompletedSince(lastCompletedBackupAt, lastBackupCondition?.lastTransitionTime)
+  ) {
     warnings.push({ id: 'last-backup', message: 'Last backup failed', severity: 'warning' });
   }
   return warnings;

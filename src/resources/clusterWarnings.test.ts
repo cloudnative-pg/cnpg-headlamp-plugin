@@ -3,6 +3,7 @@ import {
   computeClusterWarnings,
   conditionState,
   hasBackupInProgressFor,
+  lastCompletedBackupAt,
   WarningCondition,
 } from './clusterWarnings';
 
@@ -15,8 +16,9 @@ const archiving = (status: string, extra: object = {}) =>
   cond('ContinuousArchiving', status, extra);
 const lastBackup = (status: string) => cond('LastBackupSucceeded', status);
 
-const backup = (phase: string, clusterName = 'pg', namespace = 'db') => ({
+const backup = (phase: string, clusterName = 'pg', namespace = 'db', stoppedAt?: string) => ({
   phase,
+  stoppedAt,
   clusterName,
   getNamespace: () => namespace,
 });
@@ -123,5 +125,64 @@ describe('computeClusterWarnings', () => {
   it('has no warnings for a hibernated cluster', () => {
     const hibernated = { hibernated: true, backupInProgress: false };
     expect(ids([lastBackup('False'), archiving('False')], hibernated)).toEqual([]);
+  });
+});
+
+describe('lastCompletedBackupAt', () => {
+  it('returns the latest stoppedAt among completed backups of the cluster', () => {
+    const backups = [
+      backup('completed', 'pg', 'db', '2026-01-01T10:00:00Z'),
+      backup('completed', 'pg', 'db', '2026-01-01T12:00:00Z'),
+      backup('failed', 'pg', 'db', '2026-01-01T13:00:00Z'),
+      backup('completed', 'other', 'db', '2026-01-01T14:00:00Z'),
+    ];
+    expect(lastCompletedBackupAt('pg', 'db', backups)).toBe('2026-01-01T12:00:00Z');
+  });
+
+  it('is undefined with no completed backup', () => {
+    expect(lastCompletedBackupAt('pg', 'db', [backup('running')])).toBeUndefined();
+    expect(lastCompletedBackupAt('pg', 'db', null)).toBeUndefined();
+  });
+});
+
+describe('a backup that completed before the operator updated the condition', () => {
+  const failedAt = (time: string) =>
+    cond('LastBackupSucceeded', 'False', { lastTransitionTime: time });
+  const opts = (lastCompletedBackupAt?: string) => ({
+    hibernated: false,
+    backupInProgress: false,
+    lastCompletedBackupAt,
+  });
+
+  it('is not reported as a failure while the condition is still stale', () => {
+    const warnings = computeClusterWarnings(
+      [failedAt('2026-01-01T10:00:00Z')],
+      opts('2026-01-01T11:00:00Z')
+    );
+    expect(warnings).toEqual([]);
+  });
+
+  it('still warns when the failure is newer than the last completed backup', () => {
+    const warnings = computeClusterWarnings(
+      [failedAt('2026-01-01T12:00:00Z')],
+      opts('2026-01-01T11:00:00Z')
+    );
+    expect(warnings.map(w => w.id)).toEqual(['last-backup']);
+  });
+
+  it('still warns when no backup ever completed, or timestamps are missing', () => {
+    expect(computeClusterWarnings([failedAt('2026-01-01T10:00:00Z')], opts()).length).toBe(1);
+    expect(
+      computeClusterWarnings([cond('LastBackupSucceeded', 'False')], opts('2026-01-01T11:00:00Z'))
+        .length
+    ).toBe(1);
+  });
+
+  it('does not hide the WAL archiving warning', () => {
+    const warnings = computeClusterWarnings(
+      [failedAt('2026-01-01T10:00:00Z'), cond('ContinuousArchiving', 'False')],
+      opts('2026-01-01T11:00:00Z')
+    );
+    expect(warnings.map(w => w.id)).toEqual(['wal-archiving']);
   });
 });

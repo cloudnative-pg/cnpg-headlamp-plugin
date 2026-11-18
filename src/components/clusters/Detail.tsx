@@ -869,6 +869,9 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
   const [backups] = Backup.useList({ namespace: cluster.getNamespace() });
   const [scheduled] = ScheduledBackup.useList({ namespace: cluster.getNamespace() });
   const warnings = cluster.getWarnings(backups);
+  // Same rule as the warning: a failure the operator hasn't yet cleared after a completed backup
+  // is stale, so it is not reported as the last result.
+  const lastBackupFailed = warnings.some(w => w.id === 'last-backup');
 
   const clusterBackups = useMemo(
     () => (backups ?? []).filter(b => b.clusterName === cluster.getName()),
@@ -929,9 +932,9 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
               ? 'In progress'
               : cluster.isLastBackupSucceeded === undefined
               ? 'No backup reported yet'
-              : cluster.isLastBackupSucceeded
-              ? 'Succeeded'
-              : 'Failed',
+              : lastBackupFailed
+              ? 'Failed'
+              : 'Succeeded',
           },
           {
             name: 'Backup in progress',
@@ -2105,6 +2108,7 @@ export function ClusterDetail() {
   const warnings = cluster.getWarnings(backups);
   // While a new backup is in flight the previous result is stale, so the Backups tab shows no
   // pass/fail icon until it finishes (the same rule that holds back "Last backup failed").
+  const lastBackupFailed = warnings.some(w => w.id === 'last-backup');
   const showBackupResult =
     cluster.isLastBackupSucceeded !== undefined && !cluster.hasBackupInProgress(backups);
 
@@ -2158,12 +2162,10 @@ export function ClusterDetail() {
               <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
                 {showBackupResult && (
                   <HealthStatusIcon
-                    healthy={!!cluster.isLastBackupSucceeded}
+                    healthy={!lastBackupFailed}
                     size={16}
                     title={
-                      cluster.isLastBackupSucceeded
-                        ? 'Last backup succeeded'
-                        : 'Last backup did not succeed'
+                      lastBackupFailed ? 'Last backup did not succeed' : 'Last backup succeeded'
                     }
                   />
                 )}

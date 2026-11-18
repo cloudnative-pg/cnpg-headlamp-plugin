@@ -7,6 +7,7 @@ import {
   CONDITION_LAST_BACKUP_SUCCEEDED,
   conditionState,
   hasBackupInProgressFor,
+  lastCompletedBackupAt,
 } from './clusterWarnings';
 import {
   FENCE_ALL_INSTANCES,
@@ -382,6 +383,7 @@ export class Cluster extends KubeObject<CnpgCluster> {
     return computeClusterWarnings(this.status.conditions, {
       hibernated: this.isHibernated,
       backupInProgress: this.hasBackupInProgress(backups),
+      lastCompletedBackupAt: lastCompletedBackupAt(this.getName(), this.getNamespace(), backups),
     });
   }
 
