@@ -43,7 +43,8 @@ function PoolerListTitle() {
           </Button>
         </AuthDisabledButton>,
       ]}
-      stats={poolerStats(poolers ?? [])}
+      items={poolers}
+      getStats={poolerStats}
     />
   );
 }

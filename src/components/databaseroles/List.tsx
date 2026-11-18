@@ -96,7 +96,8 @@ function DatabaseRoleListTitleDefault() {
     <ListPageHeader
       title="Roles"
       actions={databaseRoleActions()}
-      stats={databaseRoleStats(roles ?? [])}
+      items={roles}
+      getStats={databaseRoleStats}
     />
   );
 }
@@ -124,7 +125,8 @@ export function DatabaseRolesList() {
           <ListPageHeader
             title={`Roles for ${clusterFilter}`}
             actions={databaseRoleActions()}
-            stats={databaseRoleStats(filteredDatabaseRoles ?? [])}
+            items={filteredDatabaseRoles}
+            getStats={databaseRoleStats}
           />
         }
         backLink={createRouteURL('CNPG Cluster', {

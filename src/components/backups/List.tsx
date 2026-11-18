@@ -97,7 +97,12 @@ function backupActions(): ReactNode[] {
 function BackupListTitleDefault() {
   const [backups] = Backup.useList();
   return (
-    <ListPageHeader title="Backups" actions={backupActions()} stats={backupStats(backups ?? [])} />
+    <ListPageHeader
+      title="Backups"
+      actions={backupActions()}
+      items={backups}
+      getStats={backupStats}
+    />
   );
 }
 
@@ -122,7 +127,8 @@ export function BackupsList() {
           <ListPageHeader
             title={`Backups for ${clusterFilter}`}
             actions={backupActions()}
-            stats={backupStats(filteredBackups ?? [])}
+            items={filteredBackups}
+            getStats={backupStats}
           />
         }
         backLink={createRouteURL('CNPG Cluster', {

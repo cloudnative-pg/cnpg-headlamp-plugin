@@ -1,7 +1,9 @@
 import { SectionFilterHeader } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import type { ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
+import { useSelector } from 'react-redux';
+import { Namespaced, NamespaceScope, scopeToNamespaces } from './namespaceScope';
 
 export interface SummaryStat {
   value: number;
@@ -17,7 +19,15 @@ export interface SummaryStat {
  * │  8 Clusters     7 Healthy     1 Needs attention     24 Instances       │
  * └─────────────────────────────────────────────────────────────────────────┘
  */
-export function SummaryBar({ stats }: { stats: SummaryStat[] }) {
+export function SummaryBar({
+  stats,
+  scope,
+}: {
+  stats: SummaryStat[];
+  /** When the namespace filter hides some items, says so next to the counts. */
+  scope?: Pick<NamespaceScope<unknown>, 'namespaces' | 'total'> & { shown: number };
+}) {
+  const hidden = scope && scope.namespaces.length > 0 && scope.shown < scope.total;
   return (
     <Box
       sx={{
@@ -47,8 +57,29 @@ export function SummaryBar({ stats }: { stats: SummaryStat[] }) {
           </Typography>
         </Box>
       ))}
+      {hidden && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ ml: 'auto', alignSelf: 'center' }}
+        >
+          Showing {scope.shown} of {scope.total} — namespace filter: {scope.namespaces.join(', ')}
+        </Typography>
+      )}
     </Box>
   );
+}
+
+/**
+ * Headlamp's selected namespaces (the "Namespace [ ... ]" filter lives in redux and only narrows
+ * the table), applied to `items` so a summary counts the same rows the table shows. Same
+ * selector the official flux plugin uses.
+ */
+export function useNamespaceScope<T extends Namespaced>(items: T[] | null): NamespaceScope<T> {
+  const selected = useSelector(
+    ({ filter }: { filter: { namespaces: Set<string> } }) => filter.namespaces
+  );
+  return useMemo(() => scopeToNamespaces(items, selected), [items, selected]);
 }
 
 /**
@@ -58,20 +89,24 @@ export function SummaryBar({ stats }: { stats: SummaryStat[] }) {
  * the summary strip below it sits above the table (ResourceListView renders `children`
  * underneath the table, so the strip can't go there).
  */
-export function ListPageHeader({
+export function ListPageHeader<T extends Namespaced>({
   title,
   actions,
-  stats,
+  items,
+  getStats,
 }: {
   title: string;
   actions: ReactNode[];
-  stats: SummaryStat[];
+  /** The list being shown; the namespace filter is applied before computing the stats. */
+  items: T[] | null;
+  getStats: (items: T[]) => SummaryStat[];
 }) {
+  const scope = useNamespaceScope(items);
   return (
     <>
       <SectionFilterHeader title={title} titleSideActions={[]} actions={actions} />
       <Box sx={{ px: 2 }}>
-        <SummaryBar stats={stats} />
+        <SummaryBar stats={getStats(scope.items)} scope={{ ...scope, shown: scope.items.length }} />
       </Box>
     </>
   );

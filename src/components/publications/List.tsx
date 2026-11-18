@@ -105,7 +105,8 @@ function PublicationListTitleDefault() {
     <ListPageHeader
       title="Publications"
       actions={publicationActions()}
-      stats={publicationStats(publications ?? [])}
+      items={publications}
+      getStats={publicationStats}
     />
   );
 }
@@ -133,7 +134,8 @@ export function PublicationsList() {
           <ListPageHeader
             title={`Publications for ${clusterFilter}`}
             actions={publicationActions()}
-            stats={publicationStats(filteredPublications ?? [])}
+            items={filteredPublications}
+            getStats={publicationStats}
           />
         }
         backLink={createRouteURL('CNPG Cluster', {

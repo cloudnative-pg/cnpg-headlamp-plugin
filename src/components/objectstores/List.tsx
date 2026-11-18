@@ -32,7 +32,8 @@ function ObjectStoreListTitle() {
           </Button>
         </AuthDisabledButton>,
       ]}
-      stats={objectStoreStats(stores ?? [])}
+      items={stores}
+      getStats={objectStoreStats}
     />
   );
 }
