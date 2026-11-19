@@ -35,7 +35,8 @@ function ClusterImageCatalogListTitle() {
           </Button>
         </AuthDisabledButton>,
       ]}
-      stats={clusterImageCatalogStats(catalogs ?? [])}
+      items={catalogs}
+      getStats={clusterImageCatalogStats}
     />
   );
 }

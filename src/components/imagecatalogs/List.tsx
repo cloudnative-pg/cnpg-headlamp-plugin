@@ -31,7 +31,8 @@ function ImageCatalogListTitle() {
           </Button>
         </AuthDisabledButton>,
       ]}
-      stats={imageCatalogStats(catalogs ?? [])}
+      items={catalogs}
+      getStats={imageCatalogStats}
     />
   );
 }

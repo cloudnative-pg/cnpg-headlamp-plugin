@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { Cluster } from '../../resources/cluster';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
+import { SummaryBar, SummaryStat, useNamespaceScope } from '../common/ListHeader';
 import { getClusterCreateUrl } from './create/CreatePage';
 import { HibernateListAction } from './hibernate';
 
@@ -66,17 +67,18 @@ function RestoreMenu() {
 // Status column below keeps the finer-grained label. Instance count is the desired
 // spec.instances total, matching `kubectl get clusters` rather than live pod counts.
 function ClusterSummaryBar() {
-  // Global counts (all namespaces) — the table below may additionally be narrowed by
-  // Headlamp's namespace filter, which lives in redux and doesn't affect this hook.
-  const [clusters] = Cluster.useList();
+  // Counts follow Headlamp's namespace filter so they match the rows in the table below.
+  const [allClusters] = Cluster.useList();
+  const scope = useNamespaceScope(allClusters);
+  const clusters = scope.items;
 
-  const total = clusters?.length ?? 0;
-  const healthy = (clusters ?? []).filter(c => c.health === 'success').length;
-  const hibernated = (clusters ?? []).filter(c => c.isHibernated).length;
+  const total = clusters.length;
+  const healthy = clusters.filter(c => c.health === 'success').length;
+  const hibernated = clusters.filter(c => c.isHibernated).length;
   const needsAttention = total - healthy - hibernated;
-  const instances = (clusters ?? []).reduce((sum, c) => sum + c.instances, 0);
+  const instances = clusters.reduce((sum, c) => sum + c.instances, 0);
 
-  const stats: { value: number; label: string; highlight?: boolean }[] = [
+  const stats: SummaryStat[] = [
     { value: total, label: total === 1 ? 'Cluster' : 'Clusters' },
     { value: healthy, label: 'Healthy' },
     { value: hibernated, label: 'Hibernated' },
@@ -84,37 +86,7 @@ function ClusterSummaryBar() {
     { value: instances, label: 'Instances' },
   ];
 
-  return (
-    <Box
-      sx={{
-        border: 1,
-        borderColor: 'divider',
-        borderRadius: 1,
-        px: 3,
-        py: 1.5,
-        mb: 2,
-        display: 'flex',
-        flexWrap: 'wrap',
-        columnGap: 5,
-        rowGap: 1,
-      }}
-    >
-      {stats.map(stat => (
-        <Box key={stat.label} display="flex" alignItems="baseline" gap={1}>
-          <Typography
-            variant="h6"
-            component="span"
-            color={stat.highlight ? 'warning.main' : 'text.primary'}
-          >
-            {stat.value}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {stat.label}
-          </Typography>
-        </Box>
-      ))}
-    </Box>
-  );
+  return <SummaryBar stats={stats} scope={{ ...scope, shown: total }} />;
 }
 
 const clusterColumns: (ResourceTableColumn<Cluster> | ColumnType)[] = [

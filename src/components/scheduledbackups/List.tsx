@@ -126,7 +126,8 @@ function ScheduledBackupListTitleDefault() {
     <ListPageHeader
       title="Scheduled Backups"
       actions={scheduledBackupActions()}
-      stats={scheduledBackupStats(backups ?? [])}
+      items={backups}
+      getStats={scheduledBackupStats}
     />
   );
 }
@@ -154,7 +155,8 @@ export function ScheduledBackupsList() {
           <ListPageHeader
             title={`Scheduled Backups for ${clusterFilter}`}
             actions={scheduledBackupActions()}
-            stats={scheduledBackupStats(filteredScheduledBackups ?? [])}
+            items={filteredScheduledBackups}
+            getStats={scheduledBackupStats}
           />
         }
         backLink={createRouteURL('CNPG Cluster', {

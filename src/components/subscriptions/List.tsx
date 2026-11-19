@@ -96,7 +96,8 @@ function SubscriptionListTitleDefault() {
     <ListPageHeader
       title="Subscriptions"
       actions={subscriptionActions()}
-      stats={subscriptionStats(subscriptions ?? [])}
+      items={subscriptions}
+      getStats={subscriptionStats}
     />
   );
 }
@@ -124,7 +125,8 @@ export function SubscriptionsList() {
           <ListPageHeader
             title={`Subscriptions for ${clusterFilter}`}
             actions={subscriptionActions()}
-            stats={subscriptionStats(filteredSubscriptions ?? [])}
+            items={filteredSubscriptions}
+            getStats={subscriptionStats}
           />
         }
         backLink={createRouteURL('CNPG Cluster', {

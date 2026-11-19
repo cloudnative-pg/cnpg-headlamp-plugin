@@ -91,7 +91,8 @@ function DatabaseListTitleDefault() {
     <ListPageHeader
       title="Databases"
       actions={databaseActions()}
-      stats={databaseStats(databases ?? [])}
+      items={databases}
+      getStats={databaseStats}
     />
   );
 }
@@ -119,7 +120,8 @@ export function DatabasesList() {
           <ListPageHeader
             title={`Databases for ${clusterFilter}`}
             actions={databaseActions()}
-            stats={databaseStats(filteredDatabases ?? [])}
+            items={filteredDatabases}
+            getStats={databaseStats}
           />
         }
         backLink={createRouteURL('CNPG Cluster', {
