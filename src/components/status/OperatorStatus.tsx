@@ -84,6 +84,41 @@ function isPodReady(pod: Pod): boolean {
   );
 }
 
+/**
+ * Short reason a pod isn't ready, e.g. "pod-x: CrashLoopBackOff" or "pod-x: Pending".
+ * Prefers a container's waiting/terminated reason (the most specific signal), then the pod
+ * phase, then the Ready condition's own reason/message.
+ */
+function describePodProblem(pod: Pod): string {
+  const name = pod.getName();
+  const containerStatuses = [
+    ...(pod.status.initContainerStatuses ?? []),
+    ...(pod.status.containerStatuses ?? []),
+  ];
+  for (const container of containerStatuses) {
+    const reason = container.state?.waiting?.reason ?? container.state?.terminated?.reason;
+    if (reason && reason !== 'Completed') {
+      return `${name}: ${reason}`;
+    }
+  }
+  if (pod.status.phase !== 'Running') {
+    return `${name}: ${pod.status.phase ?? 'Unknown'}`;
+  }
+  const ready = pod.status.conditions?.find(c => c.type === 'Ready');
+  const detail = ready?.reason ?? ready?.message;
+  return `${name}: not ready${detail ? ` (${detail})` : ''}`;
+}
+
+/** Tooltip text explaining why a set of pods is degraded; empty string when all are ready. */
+function describePodsProblems(pods: Pod[]): string {
+  if (pods.length === 0) {
+    return 'No pods found';
+  }
+  const problems = pods.filter(pod => !isPodReady(pod)).map(describePodProblem);
+  const shown = problems.slice(0, 3).join('; ');
+  return problems.length > 3 ? `${shown}; +${problems.length - 3} more` : shown;
+}
+
 // Green check / red cross used for health-style statuses — the same component as the cluster
 // details page's healthy box. Headlamp's own success.main is near-white and error.main
 // near-black-red in dark mode, so both would be unreadable there — these explicit tones stay
@@ -210,9 +245,13 @@ function OperatorSummaryCard({
     <SummaryCard
       title="Operator"
       headline={
-        <StatusLabel status={ready === pods.length ? 'success' : 'warning'}>
-          {ready === pods.length ? 'Running' : 'Degraded'}
-        </StatusLabel>
+        <Tooltip title={ready === pods.length ? '' : describePodsProblems(pods)}>
+          <span>
+            <StatusLabel status={ready === pods.length ? 'success' : 'warning'}>
+              {ready === pods.length ? 'Running' : 'Degraded'}
+            </StatusLabel>
+          </span>
+        </Tooltip>
       }
     >
       <Box>{version}</Box>
@@ -430,7 +469,7 @@ function OperatorCard({ pods, deployment }: { pods: Pod[] | null; deployment: De
                     ? 'CloudNativePG operator is not installed'
                     : allReady
                     ? 'CloudNativePG operator is running'
-                    : 'CloudNativePG operator is degraded'
+                    : `CloudNativePG operator is degraded — ${describePodsProblems(pods)}`
                 }
               />
               <Typography variant="body2" color="textSecondary">
@@ -532,7 +571,9 @@ function PluginCard({
                     ? `${humanizePluginName(pluginId)} is running`
                     : total === 0
                     ? `${humanizePluginName(pluginId)} has no pods`
-                    : `${humanizePluginName(pluginId)} is degraded`
+                    : `${humanizePluginName(pluginId)} is degraded — ${describePodsProblems(
+                        pods ?? []
+                      )}`
                 }
               />
               <Typography variant="body2" color="textSecondary">
