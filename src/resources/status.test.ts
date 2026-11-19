@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   appliedSeverity,
-  backupPhaseSeverity,
+  backupPhaseStatus,
+  clusterBackupStatus,
+  clusterPhaseStatus,
   getImageVersion,
   humanizePluginName,
   KNOWN_PLUGIN_CAPABILITIES,
@@ -30,29 +32,35 @@ describe('parseBool', () => {
   );
 });
 
-describe('backupPhaseSeverity', () => {
+describe('backupPhaseStatus', () => {
   it('marks a completed backup as success', () => {
-    expect(backupPhaseSeverity('completed')).toBe('success');
+    expect(backupPhaseStatus('completed').severity).toBe('success');
   });
 
-  // These three are the phases an operator needs to notice; `walArchivingFailing` in particular is
-  // easy to miss because the Backup object itself is otherwise unremarkable.
+  // `walArchivingFailing` in particular is easy to miss because the Backup object itself is
+  // otherwise unremarkable, so it must read as an error.
   it.each(['failed', 'walArchivingFailing', 'invalid backup definition'])(
     'marks %s as an error',
     phase => {
-      expect(backupPhaseSeverity(phase)).toBe('error');
+      expect(backupPhaseStatus(phase).severity).toBe('error');
     }
   );
 
-  it.each(['pending', 'started', 'running', 'finalizing'])('marks %s as in-progress', phase => {
-    expect(backupPhaseSeverity(phase)).toBe('warning');
+  it.each(['pending', 'started', 'running', 'finalizing'])('marks %s as in progress', phase => {
+    expect(backupPhaseStatus(phase).severity).toBe('info');
   });
 
-  // A Backup has no status.phase between creation and the operator's first reconcile, and CNPG is
-  // free to add phases we do not know about — neither should render as success or error.
+  // CNPG is free to add phases we do not know about — neither those nor a Backup that has no
+  // phase yet should render as success or error.
   it('falls back to neutral for an unknown or absent phase', () => {
-    expect(backupPhaseSeverity(undefined)).toBe('');
-    expect(backupPhaseSeverity('some-future-cnpg-phase')).toBe('');
+    expect(backupPhaseStatus(undefined)).toMatchObject({ severity: 'neutral', label: '-' });
+    expect(backupPhaseStatus('some-future-cnpg-phase').severity).toBe('neutral');
+  });
+
+  it('appends status.error to the description', () => {
+    expect(backupPhaseStatus('failed', 'bucket not found').description).toContain(
+      'bucket not found'
+    );
   });
 });
 
@@ -115,5 +123,72 @@ describe('humanizePluginName', () => {
       'Restore',
     ]);
     expect(KNOWN_PLUGIN_CAPABILITIES['my-plugin.example.io']).toBeUndefined();
+  });
+});
+
+describe('clusterPhaseStatus', () => {
+  it('reports the healthy phase as success', () => {
+    expect(clusterPhaseStatus('Cluster in healthy state').severity).toBe('success');
+  });
+
+  // Planned/transient work must read as "in progress", never as a problem.
+  it.each([
+    'Switchover in progress',
+    'Upgrading cluster',
+    'Upgrading Postgres major version',
+    'Applying configuration',
+    'Creating a new replica',
+  ])('reports %s as info', phase => {
+    expect(clusterPhaseStatus(phase).severity).toBe('info');
+  });
+
+  it.each(['Failing over', 'Waiting for user action', 'Cluster upgrade delayed'])(
+    'reports %s as warning',
+    phase => {
+      expect(clusterPhaseStatus(phase).severity).toBe('warning');
+    }
+  );
+
+  it.each([
+    'Invalid cluster definition',
+    'Cluster is unrecoverable and needs manual intervention',
+    'Unable to create required cluster objects',
+    'Cluster has incomplete or invalid image catalog',
+  ])('reports %s as error', phase => {
+    expect(clusterPhaseStatus(phase).severity).toBe('error');
+  });
+
+  it('is neutral for hibernated, unknown and missing phases', () => {
+    expect(clusterPhaseStatus('Cluster in healthy state', true)).toMatchObject({
+      severity: 'neutral',
+      label: 'Hibernated',
+    });
+    expect(clusterPhaseStatus('Some future phase')).toMatchObject({
+      severity: 'neutral',
+      label: 'Some future phase',
+    });
+    expect(clusterPhaseStatus(undefined)).toMatchObject({ severity: 'neutral', label: 'Unknown' });
+  });
+});
+
+describe('clusterBackupStatus', () => {
+  it('is undefined when no backup condition is reported', () => {
+    expect(clusterBackupStatus(undefined, undefined)).toBeUndefined();
+  });
+
+  it('is success when archiving works and the last backup succeeded', () => {
+    expect(clusterBackupStatus({ status: 'True' }, { status: 'True' })?.severity).toBe('success');
+    expect(clusterBackupStatus({ status: 'True' }, undefined)?.severity).toBe('success');
+  });
+
+  it('is an error with the reason when the last backup failed', () => {
+    const result = clusterBackupStatus({ status: 'True' }, { status: 'False', message: 'boom' });
+    expect(result).toMatchObject({ severity: 'error', label: 'Backup failed' });
+    expect(result?.description).toContain('boom');
+  });
+
+  it('is an error when WAL archiving is failing', () => {
+    const result = clusterBackupStatus({ status: 'False' }, { status: 'True' });
+    expect(result).toMatchObject({ severity: 'error', label: 'WAL archiving failing' });
   });
 });

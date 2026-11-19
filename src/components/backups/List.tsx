@@ -4,45 +4,29 @@ import {
   Link,
   ResourceListView,
   ResourceTableColumn,
-  StatusLabel,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Button from '@mui/material/Button';
-import Tooltip from '@mui/material/Tooltip';
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Backup } from '../../resources/backup';
-import { backupPhaseSeverity } from '../../resources/status';
+import { backupPhaseStatus } from '../../resources/status';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
 import { ListPageHeader, SummaryStat } from '../common/ListHeader';
+import { StatusChip } from '../common/SeverityStatus';
 import { launchBackupCreate } from './Create';
 
 const { createRouteURL } = Router;
 
+// CNPG's own `kubectl get backups` prints an Error column next to Phase, because a bare "failed"
+// chip gives an operator nothing to act on, so status.error is added to the chip's tooltip.
 export function BackupPhaseLabel({ backup }: { backup: Backup }) {
-  const phase = backup.phase;
-  const label = backupPhaseStatusLabel(phase);
-  // CNPG's own `kubectl get backups` prints an Error column next to Phase, because a bare "failed"
-  // chip gives an operator nothing to act on. Surface that same text on hover rather than making
-  // them open the detail page to find out why. Mirrors DatabaseAppliedLabel, which already inlines
-  // status.message on failure.
-  if (backup.error) {
-    return (
-      <Tooltip title={backup.error}>
-        <span>{label}</span>
-      </Tooltip>
-    );
-  }
-  return label;
-}
-
-function backupPhaseStatusLabel(phase: string | undefined) {
-  return <StatusLabel status={backupPhaseSeverity(phase)}>{phase ?? '-'}</StatusLabel>;
+  return <StatusChip status={backupPhaseStatus(backup.phase, backup.error)} />;
 }
 
 function backupStats(backups: Backup[]): SummaryStat[] {
   const total = backups.length;
   const completed = backups.filter(b => b.phase === 'completed').length;
-  const failed = backups.filter(b => backupPhaseSeverity(b.phase) === 'error').length;
+  const failed = backups.filter(b => backupPhaseStatus(b.phase).severity === 'error').length;
   return [
     { value: total, label: total === 1 ? 'Backup' : 'Backups' },
     { value: completed, label: 'Completed' },

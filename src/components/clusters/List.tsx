@@ -4,7 +4,6 @@ import {
   ResourceListView,
   ResourceTableColumn,
   SectionFilterHeader,
-  StatusLabel,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -17,6 +16,7 @@ import { useHistory } from 'react-router-dom';
 import { Cluster } from '../../resources/cluster';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
 import { SummaryBar, SummaryStat, useNamespaceScope } from '../common/ListHeader';
+import { StatusChip, StatusIcon } from '../common/SeverityStatus';
 import { getClusterCreateUrl } from './create/CreatePage';
 import { HibernateListAction } from './hibernate';
 
@@ -63,8 +63,8 @@ function RestoreMenu() {
 // │  8 Clusters     7 Healthy     1 Needs attention     24 Instances       │
 // └─────────────────────────────────────────────────────────────────────────┘
 //
-// "Needs attention" is anything not fully healthy (Degraded + Unhealthy) — the per-row
-// Status column below keeps the finer-grained label. Instance count is the desired
+// "Needs attention" counts clusters whose phase is a warning or error — the per-row
+// Status column below keeps the finer-grained label; backup problems show in the Backup column. Instance count is the desired
 // spec.instances total, matching `kubectl get clusters` rather than live pod counts.
 function ClusterSummaryBar() {
   // Counts follow Headlamp's namespace filter so they match the rows in the table below.
@@ -73,9 +73,11 @@ function ClusterSummaryBar() {
   const clusters = scope.items;
 
   const total = clusters.length;
-  const healthy = clusters.filter(c => c.health === 'success').length;
+  const healthy = clusters.filter(c => c.phaseStatus.severity === 'success').length;
   const hibernated = clusters.filter(c => c.isHibernated).length;
-  const needsAttention = total - healthy - hibernated;
+  const needsAttention = clusters.filter(c =>
+    ['warning', 'error'].includes(c.phaseStatus.severity)
+  ).length;
   const instances = clusters.reduce((sum, c) => sum + c.instances, 0);
 
   const stats: SummaryStat[] = [
@@ -109,17 +111,15 @@ const clusterColumns: (ResourceTableColumn<Cluster> | ColumnType)[] = [
   {
     id: 'status',
     label: 'Status',
-    getValue: item => item.healthLabel,
-    render: item =>
-      item.isHibernated ? (
-        <Tooltip title="Instance pods deleted, storage retained — rehydrate to resume">
-          <span>
-            <StatusLabel status={item.health}>{item.healthLabel}</StatusLabel>
-          </span>
-        </Tooltip>
-      ) : (
-        <StatusLabel status={item.health}>{item.healthLabel}</StatusLabel>
-      ),
+    getValue: item => item.phaseStatus.label,
+    render: item => <StatusChip status={item.phaseStatus} />,
+  },
+  {
+    id: 'backup',
+    label: 'Backup',
+    getValue: item => item.backupStatus?.label ?? '',
+    // Clusters that report no backup condition (no backups configured) show nothing.
+    render: item => (item.backupStatus ? <StatusIcon status={item.backupStatus} /> : null),
   },
   {
     id: 'primary',
