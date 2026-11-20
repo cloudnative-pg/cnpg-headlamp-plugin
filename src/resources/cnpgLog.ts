@@ -21,6 +21,8 @@ export interface ParsedLogLine {
    * dropped just because they're not part of the small set of fields we specifically model.
    */
   extra: Record<string, unknown>;
+  /** The csvlog `record` object of wrapped Postgres records; undefined for other lines. */
+  record?: Record<string, unknown>;
 }
 
 /** Top-level fields already surfaced as their own ParsedLogLine property. */
@@ -92,6 +94,7 @@ export function parseCnpgLogLine(raw: string): ParsedLogLine {
       logger: parsed.logger,
       message,
       extra: Object.fromEntries(extraEntries),
+      record: record && typeof record === 'object' ? record : undefined,
     };
   } catch {
     return { raw, severity: '', message: raw, extra: {} };
