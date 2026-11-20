@@ -852,7 +852,7 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
               <Box component="span" sx={{ display: 'inline-flex', verticalAlign: 'middle', mr: 1 }}>
                 {cluster.backupStatus && <StatusIcon status={cluster.backupStatus} />}
               </Box>
-              Backup Status
+              Backup Health
             </>
           }
         />
@@ -875,7 +875,7 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
       />
       {backupStatus?.severity === 'error' && (
         <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
-          {backupStatus.description} Check the Backups tab.
+          {backupStatus.description}
         </Typography>
       )}
       <Box sx={{ mt: 2 }}>

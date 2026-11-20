@@ -159,7 +159,7 @@ describe('clusterPhaseStatus', () => {
   });
 
   it('is neutral for hibernated, unknown and missing phases', () => {
-    expect(clusterPhaseStatus('Cluster in healthy state', true)).toMatchObject({
+    expect(clusterPhaseStatus('Cluster in healthy state', undefined, true)).toMatchObject({
       severity: 'neutral',
       label: 'Hibernated',
     });
@@ -168,6 +168,18 @@ describe('clusterPhaseStatus', () => {
       label: 'Some future phase',
     });
     expect(clusterPhaseStatus(undefined)).toMatchObject({ severity: 'neutral', label: 'Unknown' });
+  });
+
+  it('uses phaseReason as the description when the operator reports one', () => {
+    expect(
+      clusterPhaseStatus('Cluster is unrecoverable and needs manual intervention', 'disk full')
+    ).toMatchObject({ description: 'disk full' });
+  });
+
+  it('falls back to the raw phase string when phaseReason is empty', () => {
+    expect(clusterPhaseStatus('Cluster in healthy state', '').description).toBe(
+      'Cluster in healthy state'
+    );
   });
 });
 
@@ -181,10 +193,9 @@ describe('clusterBackupStatus', () => {
     expect(clusterBackupStatus({ status: 'True' }, undefined)?.severity).toBe('success');
   });
 
-  it('is an error with the reason when the last backup failed', () => {
+  it('is not an error when LastBackupSucceeded is false, since the operator also reports that while a backup is simply in progress', () => {
     const result = clusterBackupStatus({ status: 'True' }, { status: 'False', message: 'boom' });
-    expect(result).toMatchObject({ severity: 'error', label: 'Backup failed' });
-    expect(result?.description).toContain('boom');
+    expect(result?.severity).toBe('success');
   });
 
   it('is an error when WAL archiving is failing', () => {

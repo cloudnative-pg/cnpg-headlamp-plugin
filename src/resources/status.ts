@@ -138,106 +138,81 @@ const info = (label: string, description: string): StatusInfo => ({
   label,
   description,
 });
-const warning = (label: string, description: string): StatusInfo => ({
-  severity: 'warning',
-  label,
-  description,
-});
 const error = (label: string, description: string): StatusInfo => ({
   severity: 'error',
   label,
   description,
 });
 
-/** Known `Cluster.status.phase` values (CNPG api/v1/cluster_types.go) → severity, label, reason. */
-const CLUSTER_PHASES: Record<string, StatusInfo> = {
-  'Cluster in healthy state': {
-    severity: 'success',
-    label: 'Healthy',
-    description: 'The cluster is fully reconciled and healthy.',
+/** A phase's severity and short chip/icon label, without a description — see `clusterPhaseStatus`
+ * for why the description comes from `status.phaseReason` instead of being hardcoded here. */
+interface PhaseInfo {
+  severity: Severity;
+  label: string;
+}
+
+/** Known `Cluster.status.phase` values (CNPG api/v1/cluster_types.go) → severity, label. */
+const CLUSTER_PHASES: Record<string, PhaseInfo> = {
+  'Cluster in healthy state': { severity: 'success', label: 'Healthy' },
+  'Setting up primary': { severity: 'info', label: 'Starting' },
+  'Creating a new replica': { severity: 'info', label: 'Adding replica' },
+  'Switchover in progress': { severity: 'info', label: 'Switching over' },
+  'Promoting to primary cluster': { severity: 'info', label: 'Promoting' },
+  'Applying configuration': { severity: 'info', label: 'Applying config' },
+  'Upgrading cluster': { severity: 'info', label: 'Upgrading' },
+  'Online upgrade in progress': { severity: 'info', label: 'Upgrading' },
+  'Upgrading Postgres major version': { severity: 'info', label: 'Major upgrade' },
+  'Primary instance is being restarted in-place': { severity: 'info', label: 'Restarting primary' },
+  'Waiting for the instances to become active': {
+    severity: 'info',
+    label: 'Waiting for instances',
   },
-  'Setting up primary': info('Starting', 'The first primary instance is being set up.'),
-  'Creating a new replica': info('Adding replica', 'A new replica instance is being created.'),
-  'Switchover in progress': info(
-    'Switching over',
-    'The primary role is being moved to another instance.'
-  ),
-  'Promoting to primary cluster': info(
-    'Promoting',
-    'This replica cluster is being promoted to a primary cluster.'
-  ),
-  'Applying configuration': info(
-    'Applying config',
-    'A configuration change was detected and is being applied.'
-  ),
-  'Upgrading cluster': info('Upgrading', 'The cluster is being upgraded.'),
-  'Online upgrade in progress': info(
-    'Upgrading',
-    'The instance manager is being upgraded in place.'
-  ),
-  'Upgrading Postgres major version': info(
-    'Major upgrade',
-    'A PostgreSQL major version upgrade is in progress.'
-  ),
-  'Primary instance is being restarted in-place': info(
-    'Restarting primary',
-    'The primary instance is being restarted in place.'
-  ),
-  'Waiting for the instances to become active': info(
-    'Waiting for instances',
-    'Waiting for instance pods to become active.'
-  ),
-  'Failing over': warning(
-    'Failing over',
-    'The primary is unavailable and the operator is promoting another instance.'
-  ),
-  'Primary instance is being restarted without a switchover': warning(
-    'Restarting (no switchover)',
-    'The primary is being restarted without a switchover, so there is a short downtime.'
-  ),
-  'Cluster upgrade delayed': warning(
-    'Upgrade delayed',
-    'The cluster needs an upgrade, but the operator configuration is delaying it.'
-  ),
-  'Waiting for user action': warning(
-    'Action required',
-    'The operator is waiting for an action from you to proceed.'
-  ),
-  'Cluster cannot proceed to reconciliation due to an unknown plugin being required': error(
-    'Plugin missing',
-    'A required CNPG-i plugin is not loaded yet, so the cluster cannot be reconciled.'
-  ),
-  'Cluster cannot proceed to reconciliation due to an error while interacting with plugins': error(
-    'Plugin error',
-    'The operator failed while interacting with a CNPG-i plugin, so the cluster cannot be reconciled.'
-  ),
-  'Cluster has incomplete or invalid image catalog': error(
-    'Image catalog error',
-    'The image catalog is invalid or incomplete, so no image could be selected.'
-  ),
-  'Cluster cannot execute instance online upgrade due to missing architecture binary': error(
-    'Online upgrade blocked',
-    'The instance manager binary for this architecture is missing, so the online upgrade cannot run.'
-  ),
-  'Unable to create required cluster objects': error(
-    "Can't create objects",
-    'The operator is unable to create the Kubernetes resources the cluster needs.'
-  ),
-  'Invalid cluster definition': error(
-    'Invalid definition',
-    'The cluster definition is invalid. Check the spec and the operator logs.'
-  ),
-  'Cluster is unrecoverable and needs manual intervention': error(
-    'Unrecoverable',
-    'The cluster cannot recover on its own and needs manual intervention.'
-  ),
+  'Failing over': { severity: 'warning', label: 'Failing over' },
+  'Primary instance is being restarted without a switchover': {
+    severity: 'warning',
+    label: 'Restarting (no switchover)',
+  },
+  'Cluster upgrade delayed': { severity: 'warning', label: 'Upgrade delayed' },
+  'Waiting for user action': { severity: 'warning', label: 'Action required' },
+  'Cluster cannot proceed to reconciliation due to an unknown plugin being required': {
+    severity: 'error',
+    label: 'Plugin missing',
+  },
+  'Cluster cannot proceed to reconciliation due to an error while interacting with plugins': {
+    severity: 'error',
+    label: 'Plugin error',
+  },
+  'Cluster has incomplete or invalid image catalog': {
+    severity: 'error',
+    label: 'Image catalog error',
+  },
+  'Cluster cannot execute instance online upgrade due to missing architecture binary': {
+    severity: 'error',
+    label: 'Online upgrade blocked',
+  },
+  'Unable to create required cluster objects': { severity: 'error', label: "Can't create objects" },
+  'Invalid cluster definition': { severity: 'error', label: 'Invalid definition' },
+  'Cluster is unrecoverable and needs manual intervention': {
+    severity: 'error',
+    label: 'Unrecoverable',
+  },
 };
 
 /**
- * Status of the cluster itself, derived from `status.phase` only — backups are reported
- * separately (see `clusterBackupStatus`).
+ * Status of the cluster itself, derived from `status.phase` and `status.phaseReason` — backups
+ * are reported separately (see `clusterBackupStatus`).
+ *
+ * The description is always `phaseReason`, not a hardcoded sentence per phase: the operator sets
+ * `phaseReason` itself on every `RegisterPhase` call (CNPG's internal/controller/cluster_status.go),
+ * with the actual, instance-specific detail (an error message, a pod name, "Requested by the
+ * user", ...) — a per-phase static sentence here could only ever restate the phase name/label, so
+ * it added no information while still needing to be kept in sync with CNPG's phase strings by hand.
  */
-export function clusterPhaseStatus(phase: string | undefined, hibernated = false): StatusInfo {
+export function clusterPhaseStatus(
+  phase: string | undefined,
+  phaseReason?: string,
+  hibernated = false
+): StatusInfo {
   if (hibernated) {
     return {
       severity: 'neutral',
@@ -246,14 +221,11 @@ export function clusterPhaseStatus(phase: string | undefined, hibernated = false
     };
   }
   const known = phase ? CLUSTER_PHASES[phase] : undefined;
-  const base: StatusInfo = known ?? {
-    severity: 'neutral',
-    label: phase ? phase : 'Unknown',
-    description: phase
-      ? `Phase reported by the operator: ${phase}.`
-      : 'The operator has not reported a phase yet.',
+  return {
+    severity: known?.severity ?? 'neutral',
+    label: known?.label ?? phase ?? 'Unknown',
+    description: phaseReason || phase || 'The operator has not reported a phase yet.',
   };
-  return base;
 }
 
 /** The slice of a Cluster condition `clusterBackupStatus` needs. */
@@ -266,33 +238,34 @@ export interface BackupCondition {
  * Backup health of a cluster, from its `ContinuousArchiving` and `LastBackupSucceeded` conditions.
  * Returns `undefined` when the cluster reports neither (no backups configured) so callers can
  * render nothing. Failing WAL archiving breaks point-in-time recovery and can fill the primary's
- * disk, so it is an error just like a failed backup.
+ * disk, so it is an error on its own.
+ *
+ * `LastBackupSucceeded` is deliberately *not* used to decide the error severity: the operator
+ * flips it to `False` every time a new backup starts (see `BackupStartingCondition` in CNPG's
+ * api/v1/cluster_conditions.go) and only flips it back once that backup finishes, so it reads
+ * `False` for the whole, routine duration of every backup run — not just on actual failure.
+ * Treating that as an error would flag every in-progress backup as a cluster-wide problem.
+ *
+ * Unlike `LastBackupSucceeded`, `ContinuousArchiving` is reported as-is: a brief `False` window
+ * during every switchover/failover handoff (CNPG's
+ * pkg/management/postgres/archiver/archiver.go:133-149 — the pod that isn't `currentPrimary`
+ * refuses to archive) is genuinely true in that moment, so it is surfaced rather than hidden; see
+ * the "WAL archiving" vs. "Backups" labeling this return value drives, which is what keeps that
+ * brief, expected blip from reading as "your backups are broken".
  */
 export function clusterBackupStatus(
   archiving: BackupCondition | undefined,
   lastBackup: BackupCondition | undefined
 ): StatusInfo | undefined {
   const archivingFailing = archiving !== undefined && parseBool(archiving.status) !== true;
-  const backupFailed = lastBackup !== undefined && parseBool(lastBackup.status) !== true;
 
-  if (archivingFailing || backupFailed) {
-    const reasons: string[] = [];
-    if (archivingFailing) {
-      reasons.push(
-        `WAL archiving is failing, so point-in-time recovery may be unavailable${
-          archiving?.message ? ` (${archiving.message})` : ''
-        }.`
-      );
-    }
-    if (backupFailed) {
-      reasons.push(
-        `The last backup failed${lastBackup?.message ? ` (${lastBackup.message})` : ''}.`
-      );
-    }
+  if (archivingFailing) {
     return {
       severity: 'error',
-      label: archivingFailing ? 'WAL archiving failing' : 'Backup failed',
-      description: reasons.join(' '),
+      label: 'WAL archiving failing',
+      description: `WAL archiving is failing, so point-in-time recovery may be unavailable${
+        archiving?.message ? ` (${archiving.message})` : ''
+      }.`,
     };
   }
   if (archiving === undefined && lastBackup === undefined) {

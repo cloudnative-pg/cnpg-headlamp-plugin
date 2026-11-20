@@ -64,8 +64,9 @@ function RestoreMenu() {
 // └─────────────────────────────────────────────────────────────────────────┘
 //
 // "Needs attention" counts clusters whose phase is a warning or error — the per-row
-// Status column below keeps the finer-grained label; backup problems show in the Backup column. Instance count is the desired
-// spec.instances total, matching `kubectl get clusters` rather than live pod counts.
+// Status column below keeps the finer-grained label; backup/WAL archiving problems show in the
+// Backup Health column. Instance count is the desired spec.instances total, matching
+// `kubectl get clusters` rather than live pod counts.
 function ClusterSummaryBar() {
   // Counts follow Headlamp's namespace filter so they match the rows in the table below.
   const [allClusters] = Cluster.useList();
@@ -116,9 +117,11 @@ const clusterColumns: (ResourceTableColumn<Cluster> | ColumnType)[] = [
   },
   {
     id: 'backup',
-    label: 'Backup',
+    label: 'Backup Health',
     getValue: item => item.backupStatus?.label ?? '',
-    // Clusters that report no backup condition (no backups configured) show nothing.
+    // Clusters that report no backup condition (no backups configured) show nothing. The icon's
+    // own tooltip label ("WAL archiving failing" vs. "Backups OK") distinguishes an archiving
+    // problem from backup completion — this column covers both, not backups alone.
     render: item => (item.backupStatus ? <StatusIcon status={item.backupStatus} /> : null),
   },
   {

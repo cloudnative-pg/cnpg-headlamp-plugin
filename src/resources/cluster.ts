@@ -333,7 +333,7 @@ export class Cluster extends KubeObject<CnpgCluster> {
    * not part of it — see `backupStatus`.
    */
   get phaseStatus(): StatusInfo {
-    return clusterPhaseStatus(this.phase, this.isHibernated);
+    return clusterPhaseStatus(this.phase, this.status.phaseReason, this.isHibernated);
   }
 
   /** Backup health from the ContinuousArchiving / LastBackupSucceeded conditions, if reported. */
