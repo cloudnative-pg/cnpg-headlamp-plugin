@@ -27,7 +27,7 @@ A [Headlamp](https://headlamp.dev/) plugin for managing and visualizing [CloudNa
 
 List and detail views, plus a guided creation form.
 
-- Traffic-light health indicator (phase, WAL archiving, last backup)
+- A cluster **status chip** driven only by the operator phase (green healthy, blue in progress such as switchover or upgrade, orange needs attention, red error), plus a separate **backup indicator** (WAL archiving and last backup) in the list and detail pages; both have tooltips explaining the reason and are readable in light and dark themes
 - Instance roles and synchronous replication warnings
 - Per-instance Postgres logs (filterable, color-coded, live-following)
 - A `psql` terminal against the primary or any replica

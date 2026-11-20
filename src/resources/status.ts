@@ -41,25 +41,6 @@ export function parseBool(value: string | undefined): boolean | undefined {
   }
 }
 
-/** Phases CNPG reports on `Backup.status.phase`. */
-export function backupPhaseSeverity(phase: string | undefined): StatusSeverity {
-  switch (phase) {
-    case 'completed':
-      return 'success';
-    case 'failed':
-    case 'walArchivingFailing':
-    case 'invalid backup definition':
-      return 'error';
-    case 'pending':
-    case 'started':
-    case 'running':
-    case 'finalizing':
-      return 'warning';
-    default:
-      return '';
-  }
-}
-
 /**
  * The declarative CRDs (Database, DatabaseRole, Publication, Subscription) all report progress the
  * same way: a tri-state `status.applied` plus a `status.message` explaining a failure.
@@ -135,4 +116,199 @@ export function humanizePluginName(pluginId: string): string {
     .filter(Boolean)
     .map(word => word.charAt(0).toUpperCase() + word.slice(1));
   return words.length > 0 ? words.join(' ') : pluginId;
+}
+
+/**
+ * Four-level severity used by the cluster status chip and the backup status icon. `info` (blue)
+ * is for expected, transient work (a planned switchover, an upgrade) — it must never read as a
+ * problem. `neutral` is for states with nothing to judge (hibernated, unknown phase).
+ */
+export type Severity = 'success' | 'info' | 'warning' | 'error' | 'neutral';
+
+export interface StatusInfo {
+  severity: Severity;
+  /** Short chip/icon label. */
+  label: string;
+  /** Human-readable explanation, shown in a tooltip. */
+  description: string;
+}
+
+const info = (label: string, description: string): StatusInfo => ({
+  severity: 'info',
+  label,
+  description,
+});
+const error = (label: string, description: string): StatusInfo => ({
+  severity: 'error',
+  label,
+  description,
+});
+
+/** A phase's severity and short chip/icon label, without a description — see `clusterPhaseStatus`
+ * for why the description comes from `status.phaseReason` instead of being hardcoded here. */
+interface PhaseInfo {
+  severity: Severity;
+  label: string;
+}
+
+/** Known `Cluster.status.phase` values (CNPG api/v1/cluster_types.go) → severity, label. */
+const CLUSTER_PHASES: Record<string, PhaseInfo> = {
+  'Cluster in healthy state': { severity: 'success', label: 'Healthy' },
+  'Setting up primary': { severity: 'info', label: 'Starting' },
+  'Creating a new replica': { severity: 'info', label: 'Adding replica' },
+  'Switchover in progress': { severity: 'info', label: 'Switching over' },
+  'Promoting to primary cluster': { severity: 'info', label: 'Promoting' },
+  'Applying configuration': { severity: 'info', label: 'Applying config' },
+  'Upgrading cluster': { severity: 'info', label: 'Upgrading' },
+  'Online upgrade in progress': { severity: 'info', label: 'Upgrading' },
+  'Upgrading Postgres major version': { severity: 'info', label: 'Major upgrade' },
+  'Primary instance is being restarted in-place': { severity: 'info', label: 'Restarting primary' },
+  'Waiting for the instances to become active': {
+    severity: 'info',
+    label: 'Waiting for instances',
+  },
+  'Failing over': { severity: 'warning', label: 'Failing over' },
+  'Primary instance is being restarted without a switchover': {
+    severity: 'warning',
+    label: 'Restarting (no switchover)',
+  },
+  'Cluster upgrade delayed': { severity: 'warning', label: 'Upgrade delayed' },
+  'Waiting for user action': { severity: 'warning', label: 'Action required' },
+  'Cluster cannot proceed to reconciliation due to an unknown plugin being required': {
+    severity: 'error',
+    label: 'Plugin missing',
+  },
+  'Cluster cannot proceed to reconciliation due to an error while interacting with plugins': {
+    severity: 'error',
+    label: 'Plugin error',
+  },
+  'Cluster has incomplete or invalid image catalog': {
+    severity: 'error',
+    label: 'Image catalog error',
+  },
+  'Cluster cannot execute instance online upgrade due to missing architecture binary': {
+    severity: 'error',
+    label: 'Online upgrade blocked',
+  },
+  'Unable to create required cluster objects': { severity: 'error', label: "Can't create objects" },
+  'Invalid cluster definition': { severity: 'error', label: 'Invalid definition' },
+  'Cluster is unrecoverable and needs manual intervention': {
+    severity: 'error',
+    label: 'Unrecoverable',
+  },
+};
+
+/**
+ * Status of the cluster itself, derived from `status.phase` and `status.phaseReason` — backups
+ * are reported separately (see `clusterBackupStatus`).
+ *
+ * The description is always `phaseReason`, not a hardcoded sentence per phase: the operator sets
+ * `phaseReason` itself on every `RegisterPhase` call (CNPG's internal/controller/cluster_status.go),
+ * with the actual, instance-specific detail (an error message, a pod name, "Requested by the
+ * user", ...) — a per-phase static sentence here could only ever restate the phase name/label, so
+ * it added no information while still needing to be kept in sync with CNPG's phase strings by hand.
+ */
+export function clusterPhaseStatus(
+  phase: string | undefined,
+  phaseReason?: string,
+  hibernated = false
+): StatusInfo {
+  if (hibernated) {
+    return {
+      severity: 'neutral',
+      label: 'Hibernated',
+      description: 'Instance pods deleted, storage retained — rehydrate to resume',
+    };
+  }
+  const known = phase ? CLUSTER_PHASES[phase] : undefined;
+  return {
+    severity: known?.severity ?? 'neutral',
+    label: known?.label ?? phase ?? 'Unknown',
+    description: phaseReason || phase || 'The operator has not reported a phase yet.',
+  };
+}
+
+/** The slice of a Cluster condition `clusterBackupStatus` needs. */
+export interface BackupCondition {
+  status?: string;
+  message?: string;
+}
+
+/**
+ * Backup health of a cluster, from its `ContinuousArchiving` and `LastBackupSucceeded` conditions.
+ * Returns `undefined` when the cluster reports neither (no backups configured) so callers can
+ * render nothing. Failing WAL archiving breaks point-in-time recovery and can fill the primary's
+ * disk, so it is an error on its own.
+ *
+ * `LastBackupSucceeded` is deliberately *not* used to decide the error severity: the operator
+ * flips it to `False` every time a new backup starts (see `BackupStartingCondition` in CNPG's
+ * api/v1/cluster_conditions.go) and only flips it back once that backup finishes, so it reads
+ * `False` for the whole, routine duration of every backup run — not just on actual failure.
+ * Treating that as an error would flag every in-progress backup as a cluster-wide problem.
+ *
+ * Unlike `LastBackupSucceeded`, `ContinuousArchiving` is reported as-is: a brief `False` window
+ * during every switchover/failover handoff (CNPG's
+ * pkg/management/postgres/archiver/archiver.go:133-149 — the pod that isn't `currentPrimary`
+ * refuses to archive) is genuinely true in that moment, so it is surfaced rather than hidden; see
+ * the "WAL archiving" vs. "Backups" labeling this return value drives, which is what keeps that
+ * brief, expected blip from reading as "your backups are broken".
+ */
+export function clusterBackupStatus(
+  archiving: BackupCondition | undefined,
+  lastBackup: BackupCondition | undefined
+): StatusInfo | undefined {
+  const archivingFailing = archiving !== undefined && parseBool(archiving.status) !== true;
+
+  if (archivingFailing) {
+    return {
+      severity: 'error',
+      label: 'WAL archiving failing',
+      description: `WAL archiving is failing, so point-in-time recovery may be unavailable${
+        archiving?.message ? ` (${archiving.message})` : ''
+      }.`,
+    };
+  }
+  if (archiving === undefined && lastBackup === undefined) {
+    return undefined;
+  }
+  return {
+    severity: 'success',
+    label: 'Backups OK',
+    description:
+      archiving !== undefined && lastBackup !== undefined
+        ? 'WAL archiving is working and the last backup completed.'
+        : archiving !== undefined
+        ? 'WAL archiving is working.'
+        : 'The last backup completed.',
+  };
+}
+
+/** Known `Backup.status.phase` values (CNPG api/v1/backup_types.go) → severity, label, reason. */
+const BACKUP_PHASES: Record<string, StatusInfo> = {
+  completed: { severity: 'success', label: 'Completed', description: 'The backup completed.' },
+  pending: info('Pending', 'The backup is waiting to be started.'),
+  started: info('Started', 'The backup has started.'),
+  running: info('Running', 'The backup is running.'),
+  finalizing: info(
+    'Finalizing',
+    'A consistent backup was taken; waiting for it to be ready to restore from.'
+  ),
+  failed: error('Failed', 'The backup failed.'),
+  walArchivingFailing: error(
+    'WAL archiving failing',
+    'WAL archiving is not working, so this backup cannot be used for point-in-time recovery.'
+  ),
+  'invalid backup definition': error('Invalid definition', 'The backup definition is invalid.'),
+};
+
+/** Status of a single Backup, from `status.phase`; `errorMessage` is `status.error`, if any. */
+export function backupPhaseStatus(phase: string | undefined, errorMessage?: string): StatusInfo {
+  const base: StatusInfo = (phase ? BACKUP_PHASES[phase] : undefined) ?? {
+    severity: 'neutral',
+    label: phase ?? '-',
+    description: phase
+      ? `Phase reported by the operator: ${phase}.`
+      : 'The operator has not reported a phase yet.',
+  };
+  return errorMessage ? { ...base, description: `${base.description} ${errorMessage}` } : base;
 }

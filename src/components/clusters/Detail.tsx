@@ -66,6 +66,7 @@ import {
   sumMetric,
   usePodMetrics,
 } from '../common/promScrape';
+import { StatusChip, StatusIcon } from '../common/SeverityStatus';
 import { PoolerStatusLabel } from '../poolers/List';
 import {
   ScheduledBackupScheduleLabel,
@@ -321,40 +322,6 @@ function StatCard({
   );
 }
 
-// Green check / red cross used for health-style statuses. Headlamp's own success.main is
-// near-white and error.main near-black-red in dark mode, so both would be unreadable there —
-// these explicit tones stay legible on light and dark backgrounds alike.
-function HealthStatusIcon({
-  healthy,
-  size = 20,
-  title,
-}: {
-  healthy: boolean;
-  size?: number;
-  title: string;
-}) {
-  return (
-    <Tooltip title={title}>
-      <Box
-        component="span"
-        sx={{
-          display: 'inline-flex',
-          color: theme =>
-            healthy
-              ? theme.palette.mode === 'dark'
-                ? '#66bb6a'
-                : '#2e7d32'
-              : theme.palette.mode === 'dark'
-              ? '#ef5350'
-              : '#c62828',
-        }}
-      >
-        <Icon icon={healthy ? 'mdi:check-circle' : 'mdi:close-circle'} width={size} height={size} />
-      </Box>
-    </Tooltip>
-  );
-}
-
 function SummaryStrip({ cluster }: { cluster: Cluster }) {
   const [pvcs] = K8s.ResourceClasses.PersistentVolumeClaim.useList({
     namespace: cluster.getNamespace(),
@@ -391,14 +358,8 @@ function SummaryStrip({ cluster }: { cluster: Cluster }) {
       <Grid item xs={12} sm={6} md={4} lg={2.4}>
         <StatCard
           icon={<Icon icon="mdi:hexagon-multiple-outline" width={18} height={18} />}
-          title="Health"
-          value={
-            <HealthStatusIcon
-              healthy={cluster.health === 'success'}
-              size={22}
-              title={cluster.healthLabel}
-            />
-          }
+          title="Status"
+          value={<StatusChip status={cluster.phaseStatus} />}
         />
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={2.4}>
@@ -879,7 +840,7 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
     cluster.spec.backup?.volumeSnapshot?.className ??
     '-';
 
-  const healthy = cluster.isLastBackupSucceeded !== false;
+  const backupStatus = cluster.backupStatus;
 
   return (
     <SectionBox
@@ -889,13 +850,9 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
           title={
             <>
               <Box component="span" sx={{ display: 'inline-flex', verticalAlign: 'middle', mr: 1 }}>
-                <HealthStatusIcon
-                  healthy={cluster.health === 'success'}
-                  size={20}
-                  title={cluster.healthLabel}
-                />
+                {cluster.backupStatus && <StatusIcon status={cluster.backupStatus} />}
               </Box>
-              Backup Status
+              Backup Health
             </>
           }
         />
@@ -916,9 +873,9 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
           { name: 'Backup location', value: backupLocation },
         ]}
       />
-      {!healthy && (
-        <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 1 }}>
-          Last backup did not succeed — check the Backups tab.
+      {backupStatus?.severity === 'error' && (
+        <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+          {backupStatus.description}
         </Typography>
       )}
       <Box sx={{ mt: 2 }}>
@@ -2101,17 +2058,7 @@ export function ClusterDetail() {
           <Tab
             label={
               <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-                {cluster.isLastBackupSucceeded !== undefined && (
-                  <HealthStatusIcon
-                    healthy={cluster.isLastBackupSucceeded}
-                    size={16}
-                    title={
-                      cluster.isLastBackupSucceeded
-                        ? 'Last backup succeeded'
-                        : 'Last backup did not succeed'
-                    }
-                  />
-                )}
+                {cluster.backupStatus && <StatusIcon status={cluster.backupStatus} size={16} />}
                 Backups
               </Box>
             }

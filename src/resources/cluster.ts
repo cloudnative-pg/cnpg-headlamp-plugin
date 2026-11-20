@@ -5,7 +5,7 @@ import {
   parseFencedInstances,
   updateFencedInstances,
 } from './fencing';
-import { parseBool } from './status';
+import { clusterBackupStatus, clusterPhaseStatus, parseBool, StatusInfo } from './status';
 
 /** A single entry in Cluster.status.conditions (standard metav1.Condition shape). */
 export interface ClusterCondition {
@@ -118,9 +118,6 @@ export interface CnpgCluster extends KubeObjectInterface {
   };
 }
 
-/** Cluster.status.phase value CNPG uses when everything is reconciled and healthy. */
-const PHASE_HEALTHY = 'Cluster in healthy state';
-
 /**
  * Declarative hibernation annotation (see CNPG's `kubectl cnpg hibernate` command in
  * internal/cmd/plugin/hibernate/cmd.go): 'on' requests hibernation (all instance pods are
@@ -136,8 +133,6 @@ export const HIBERNATION_CONDITION_TYPE = 'cnpg.io/hibernation';
 
 const CONDITION_CONTINUOUS_ARCHIVING = 'ContinuousArchiving';
 const CONDITION_LAST_BACKUP_SUCCEEDED = 'LastBackupSucceeded';
-
-export type ClusterHealth = 'success' | 'warning' | 'error';
 
 export class Cluster extends KubeObject<CnpgCluster> {
   static kind = 'Cluster';
@@ -263,10 +258,6 @@ export class Cluster extends KubeObject<CnpgCluster> {
     } as any);
   }
 
-  get isPhaseHealthy(): boolean {
-    return this.phase === PHASE_HEALTHY;
-  }
-
   getCondition(type: string): ClusterCondition | undefined {
     return this.status.conditions?.find(condition => condition.type === type);
   }
@@ -338,40 +329,19 @@ export class Cluster extends KubeObject<CnpgCluster> {
   }
 
   /**
-   * Traffic-light health for the cluster:
-   * - error (red): the cluster phase itself is unhealthy.
-   * - warning (yellow): phase is healthy, but WAL archiving and/or the last backup aren't confirmed good.
-   * - success (green): phase is healthy, WAL archiving is working, and the last backup succeeded
-   *   (or no backup has been configured/taken yet, in which case it isn't held against the cluster).
-   *
-   * A hibernated cluster has no status to judge, so it reports warning — never success (it isn't
-   * running) and never error (nothing is actually wrong). Its label reads 'Hibernated' instead.
+   * Status of the cluster itself, from `status.phase` (or hibernation). Backups are deliberately
+   * not part of it — see `backupStatus`.
    */
-  get health(): ClusterHealth {
-    if (this.isHibernated) {
-      return 'warning';
-    }
-    if (!this.isPhaseHealthy) {
-      return 'error';
-    }
-    if (this.isArchivingWal === false || this.isLastBackupSucceeded === false) {
-      return 'warning';
-    }
-    return 'success';
+  get phaseStatus(): StatusInfo {
+    return clusterPhaseStatus(this.phase, this.status.phaseReason, this.isHibernated);
   }
 
-  get healthLabel(): string {
-    if (this.isHibernated) {
-      return 'Hibernated';
-    }
-    switch (this.health) {
-      case 'success':
-        return 'Healthy';
-      case 'warning':
-        return 'Degraded';
-      default:
-        return 'Unhealthy';
-    }
+  /** Backup health from the ContinuousArchiving / LastBackupSucceeded conditions, if reported. */
+  get backupStatus(): StatusInfo | undefined {
+    return clusterBackupStatus(
+      this.getCondition(CONDITION_CONTINUOUS_ARCHIVING),
+      this.getCondition(CONDITION_LAST_BACKUP_SUCCEEDED)
+    );
   }
 
   /** The VolumeSnapshotClass configured for volume-snapshot backups, if any. */
