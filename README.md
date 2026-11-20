@@ -30,6 +30,12 @@ List and detail views, plus a guided creation form.
 - A cluster **status chip** driven only by the operator phase (green healthy, blue in progress such as switchover or upgrade, orange needs attention, red error), plus a separate **backup indicator** (WAL archiving and last backup) in the list and detail pages; both have tooltips explaining the reason and are readable in light and dark themes
 - Instance roles and synchronous replication warnings
 - Per-instance Postgres logs (filterable, color-coded, live-following)
+- A **Logs** tab on the cluster's detail page that merges the structured PostgreSQL logs of every instance into one view:
+  - **Insights** tiles with trend sparklines for connections, slow statements, lock waits, and errors & fatals, plus per-instance **activity** bars (volume per time bin, split by severity so warnings aren't hidden by errors)
+  - A **log stream** with category chips and live counts (Connections, Statements, WAL, Autovacuum, Constraints, Locks, Server, Standby, App errors), search, instance/severity/time-range filters, sorting, and pagination. Selecting a row opens a side panel (like the per-pod log viewer) with the event, PostgreSQL context (statement, detail, hint, context), parsed fields and the log's JSON, with previous/next stepping
+  - Live following (pausable; the list holds still while a log is open), and a download of the listed lines as JSON Lines
+  - A **container** dropdown, as in the per-pod log viewer (`postgres` by default, plus `bootstrap-controller` and any sidecars such as the Barman Cloud plugin). Other containers' structured log lines use the same stream, with a Logger column in place of the Postgres-specific tiles and categories
+  - The slow-statement, lock-wait and connection tiles need the matching Postgres settings (`log_min_duration_statement`, `log_lock_waits`, `log_connections`); `scripts/generate-pg-logs.sh` enables them for a demo database and produces sample traffic (see CONTRIBUTING)
 - A `psql` terminal against the primary or any replica
 - A **Live Metrics** section on the cluster's detail page, scraped from each instance's CNPG Prometheus exporter (port 9187) via the Kubernetes API's pod proxy subresource — no `psql` or exec involved. It is organized into collapsible categories:
   - **Replication & Archiving** (primary only): connected standbys, replication lag, inactive slots, WAL archiving failures, backlog and timing, sync replica counts, plus per-standby and per-slot detail tables
