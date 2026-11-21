@@ -154,7 +154,7 @@ const AUTOVACUUM_MESSAGE = /^automatic (aggressive )?(vacuum|analyze)/;
 const WAL_MESSAGE =
   /^(checkpoint|restartpoint|recovery restart point|checkpoints are occurring|archive command|archiving write-ahead|could not archive|removing (WAL|write-ahead)|WAL )/;
 const SERVER_MESSAGE =
-  /^(received SIGHUP|parameter ".*" changed|database system|listening on|starting PostgreSQL|redirecting log|ending log|shutting down|aborting any active|background worker|worker process)/;
+  /^(received SIGHUP|parameter ".*" changed|(the )?database system|listening on|starting PostgreSQL|redirecting log|ending log|shutting down|aborting any active|background worker|worker process)/;
 
 export function categorizeRecord(input: {
   message: string;
