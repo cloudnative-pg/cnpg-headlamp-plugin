@@ -76,3 +76,17 @@ mise exec -- npm run screenshots             # writes img/*.png (1440x900 @2x)
 Notes: the script reuses the `cdp-verify.mjs` CDP setup (no new dependencies) and
 prefers the demo objects (`cnpg-demo/demo-pg`, `cnpg-demo/demo-db`) so shots are
 stable; without them it falls back to the first row in each list.
+
+### Generating PostgreSQL log traffic
+
+The cluster **Logs** tab is only interesting when Postgres has something to say. `scripts/generate-pg-logs.sh` creates a declarative `Database` (default `<cluster>-logdemo`) in a CNPG cluster and runs scenarios that produce each log category: connections and failed logins, slow statements and temp-file spills, constraint violations, application errors (permission denied, timeouts, syntax errors), lock waits and a deadlock, WAL/checkpoints, autovacuum, standby reconnects and config reloads.
+
+```bash
+scripts/generate-pg-logs.sh                                  # current kubectl context, default/demo1
+scripts/generate-pg-logs.sh --context kind-demo -n default -c demo1 -r 6 -i 30   # 6 rounds, 30s apart
+scripts/generate-pg-logs.sh run locks errors                 # only some stages
+scripts/generate-pg-logs.sh --help                           # all options and stages
+scripts/generate-pg-logs.sh teardown                         # remove everything it created
+```
+
+Besides the database and a `logdemo_readonly` role, it patches three logging parameters into the Cluster's `spec.postgresql.parameters` (`log_connections`, `log_disconnections`, `log_autovacuum_min_duration`), because Postgres can't set them per database; `teardown` removes them again. The remaining settings (slow-statement threshold, lock-wait and temp-file logging, DDL logging) are applied with `ALTER DATABASE` on the demo database only. Only run it against a cluster you're happy to add demo data to.

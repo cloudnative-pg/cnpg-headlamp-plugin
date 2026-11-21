@@ -138,7 +138,7 @@ function LogRow({
   );
 }
 
-function FieldRow({ label, value }: { label: string; value: string }) {
+export function FieldRow({ label, value }: { label: string; value: string }) {
   return (
     <Box sx={{ display: 'flex', gap: 2, py: 0.25 }}>
       <Typography variant="body2" color="text.secondary" sx={{ width: 130, flexShrink: 0 }}>
@@ -151,19 +151,32 @@ function FieldRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DetailSection({ title, children }: { title: string; children: ReactNode }) {
+export function DetailSection({
+  title,
+  children,
+  divider = true,
+}: {
+  title: string;
+  children: ReactNode;
+  /** Off where the content brings its own border (e.g. a table). */
+  divider?: boolean;
+}) {
   return (
     <Box sx={{ mt: 2 }}>
-      <Typography variant="overline" color="text.secondary">
+      <Typography
+        variant="overline"
+        color="text.secondary"
+        sx={divider ? undefined : { display: 'block', mb: 0.5 }}
+      >
         {title}
       </Typography>
-      <Divider sx={{ mb: 0.5 }} />
+      {divider && <Divider sx={{ mb: 0.5 }} />}
       {children}
     </Box>
   );
 }
 
-const codeSx = {
+export const codeSx = {
   m: 0,
   p: 1,
   fontFamily: 'monospace',
