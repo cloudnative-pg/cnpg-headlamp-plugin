@@ -209,6 +209,13 @@ describe('categorizeRecord', () => {
       { message: 'inventory below threshold for sku 4217', severity: 'WARNING' },
       'other',
     ],
+    [
+      // A client connected before recovery finished; FATAL severity but a normal startup
+      // condition, not an application error. Must not fall into the severity-only 'errors' catch-all.
+      'client connects before the system has finished starting up',
+      { message: 'the database system is starting up', severity: 'FATAL', sqlState: '57P03' },
+      'server',
+    ],
     // Regressions: identifiers inside error messages must not drag them into another category.
     [
       'missing relation named like a WAL archive',

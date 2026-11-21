@@ -125,21 +125,22 @@ function InsightTile({
   description: string;
 }) {
   return (
-    <Box
-      role="group"
-      aria-label={title}
-      sx={{
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 1,
-        p: 1.5,
-        height: '100%',
-        position: 'relative',
-      }}
-    >
-      <Tooltip title={description}>
+    <Tooltip title={description}>
+      <Box
+        role="group"
+        aria-label={title}
+        sx={{
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 1,
+          p: 1.5,
+          height: '100%',
+          position: 'relative',
+        }}
+      >
         <Box
           component="span"
+          aria-hidden
           sx={{
             position: 'absolute',
             top: 12,
@@ -150,20 +151,20 @@ function InsightTile({
             bgcolor: statusColor,
           }}
         />
-      </Tooltip>
-      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-        {title}
-      </Typography>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 0.25 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-          {formatCount(total)}
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+          {title}
         </Typography>
-        <TrendLabel trend={trend} increaseIsBad={increaseIsBad} />
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 0.25 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+            {formatCount(total)}
+          </Typography>
+          <TrendLabel trend={trend} increaseIsBad={increaseIsBad} />
+        </Box>
+        <Box sx={{ mt: 1 }}>
+          <Sparkline series={series} color={statusColor} />
+        </Box>
       </Box>
-      <Box sx={{ mt: 1 }}>
-        <Sparkline series={series} color={statusColor} />
-      </Box>
-    </Box>
+    </Tooltip>
   );
 }
 
