@@ -1,7 +1,7 @@
-version: 0.1.6
+version: 0.1.7
 name: cnpg-headlamp-plugin
 displayName: CloudNativePG
-createdAt: '2026-10-22T07:38:17Z'
+createdAt: '2026-11-22T15:42:42Z'
 logoPath: logo/cloudnativepg-portrait-blue.svg
 description: Manage CloudNativePG Clusters, Poolers, Backups, and Databases — directly in Headlamp.
 license: Apache-2.0
@@ -36,7 +36,7 @@ screenshots:
   - title: Database detail
     url: https://raw.githubusercontent.com/cloudnative-pg/cnpg-headlamp-plugin/main/img/database-detail.png
 annotations:
-  headlamp/plugin/archive-url: https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases/download/v0.1.6/cnpg-headlamp-plugin-0.1.6.tar.gz
-  headlamp/plugin/archive-checksum: SHA256:1061a1ab4b77ed480c72f71cdc6b11d92ddccba15012f2c192ffde9d31fbfeaa
+  headlamp/plugin/archive-url: https://github.com/cloudnative-pg/cnpg-headlamp-plugin/releases/download/v0.1.7/cnpg-headlamp-plugin-0.1.7.tar.gz
+  headlamp/plugin/archive-checksum: SHA256:0711fc1ced69acc7665d956be40f9e72bdbb5512bd320d2f05a788e1b9732010
   headlamp/plugin/version-compat: '>=0.42'
   headlamp/plugin/distro-compat: in-cluster,web,docker-desktop,desktop
