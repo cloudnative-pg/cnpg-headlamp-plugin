@@ -1,4 +1,4 @@
-import { K8s, Router, Utils } from '@kinvolk/headlamp-plugin/lib';
+import { Router } from '@kinvolk/headlamp-plugin/lib';
 import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -22,6 +22,7 @@ import { ObjectStore } from '../../../resources/objectStore';
 import { PluginConfiguration } from '../../../resources/pluginConfiguration';
 import { VolumeSnapshotClass } from '../../../resources/volumeSnapshotClass';
 import { AuthDisabledButton } from '../../common/AuthDisabledButton';
+import { NamespaceField } from '../../common/NamespaceField';
 import { RequiredLabel } from '../../common/RequiredLabel';
 import { StorageSizeClassFields } from '../../common/StorageSizeClassFields';
 import { YamlPreview } from '../../common/YamlPreview';
@@ -207,22 +208,6 @@ function GeneralTab({
   newRowId,
   goToTab,
 }: TabProps & { goToTab: (tab: CreateTab) => void }) {
-  const [namespaces, namespacesError] = K8s.ResourceClasses.Namespace.useList();
-  // Listing Namespaces cluster-wide needs its own RBAC, which namespace-scoped users (e.g.
-  // bound only via a Role in "team-a") don't have. When the Headlamp cluster has Allowed
-  // Namespaces configured (same source AuthDisabledButton's allowedNamespacesHint uses), trust
-  // it directly over the list API result — it's what the admin already scoped this cluster to,
-  // and it works even though the list call above fails for this user. Only fall back to the API
-  // result, and further to free text on error, when Allowed Namespaces isn't configured.
-  const allowedNamespaces = K8s.cluster.getAllowedNamespaces(Utils.getCluster());
-  const namespaceListDenied =
-    allowedNamespaces.length === 0 && !!namespacesError && !namespaces;
-  const namespaceOptions =
-    allowedNamespaces.length > 0
-      ? allowedNamespaces
-      : namespaces && namespaces.length > 0
-      ? namespaces.map(ns => ns.getName())
-      : [];
   const [objectStores] = ObjectStore.useList({ namespace: state.namespace });
   const [pluginConfigurations] = PluginConfiguration.useList({ namespace: state.namespace });
   const selection = instanceCardSelection(state.instances);
@@ -278,44 +263,12 @@ function GeneralTab({
             }
             sx={{ flex: 1, minWidth: 200 }}
           />
-          {namespaceOptions.length > 0 ? (
-            <FormControl fullWidth margin="normal" sx={{ flex: 1, minWidth: 200 }}>
-              <InputLabel id="create-cluster-namespace-label">
-                <RequiredLabel label="Namespace" required />
-              </InputLabel>
-              <Select
-                labelId="create-cluster-namespace-label"
-                label={<RequiredLabel label="Namespace" required />}
-                value={state.namespace}
-                onChange={e => update({ namespace: e.target.value })}
-              >
-                {namespaceOptions.map(name => (
-                  <MenuItem key={name} value={name}>
-                    {name}
-                  </MenuItem>
-                ))}
-              </Select>
-              {allowedNamespaces.length > 0 && (
-                <Typography variant="caption" color="text.secondary">
-                  Showing this cluster's Allowed Namespaces setting.
-                </Typography>
-              )}
-            </FormControl>
-          ) : (
-            <TextField
-              fullWidth
-              margin="normal"
-              label={<RequiredLabel label="Namespace" required />}
-              value={state.namespace}
-              onChange={e => update({ namespace: e.target.value })}
-              helperText={
-                namespaceListDenied
-                  ? "You don't have permission to list Namespaces and this cluster has no Allowed Namespaces configured — enter the namespace name directly."
-                  : undefined
-              }
-              sx={{ flex: 1, minWidth: 200 }}
-            />
-          )}
+          <NamespaceField
+            idPrefix="create-cluster"
+            value={state.namespace}
+            onChange={namespace => update({ namespace })}
+            sx={{ flex: 1, minWidth: 200 }}
+          />
         </Box>
       </SectionBox>
 
