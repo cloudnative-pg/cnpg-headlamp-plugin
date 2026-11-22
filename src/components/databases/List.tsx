@@ -76,6 +76,7 @@ function databaseActions(): ReactNode[] {
       key="create-database"
       item={Database}
       authVerb="create"
+      allowedNamespacesHint
       deniedMessage="You don't have permission to create Databases."
     >
       <Button variant="contained" color="primary" onClick={() => launchDatabaseCreate()}>

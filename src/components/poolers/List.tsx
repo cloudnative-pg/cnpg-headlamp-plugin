@@ -36,6 +36,7 @@ function PoolerListTitle() {
           key="create-pooler"
           item={Pooler}
           authVerb="create"
+          allowedNamespacesHint
           deniedMessage="You don't have permission to create Poolers."
         >
           <Button variant="contained" color="primary" onClick={() => launchPoolerCreate()}>

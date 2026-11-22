@@ -81,6 +81,7 @@ function subscriptionActions(): ReactNode[] {
       key="create-subscription"
       item={Subscription}
       authVerb="create"
+      allowedNamespacesHint
       deniedMessage="You don't have permission to create Subscriptions."
     >
       <Button variant="contained" color="primary" onClick={() => launchSubscriptionCreate()}>

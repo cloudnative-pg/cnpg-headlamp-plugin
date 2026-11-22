@@ -81,6 +81,7 @@ function databaseRoleActions(): ReactNode[] {
       key="create-databaserole"
       item={DatabaseRole}
       authVerb="create"
+      allowedNamespacesHint
       deniedMessage="You don't have permission to create DatabaseRoles."
     >
       <Button variant="contained" color="primary" onClick={() => launchDatabaseRoleCreate()}>

@@ -25,6 +25,7 @@ function ObjectStoreListTitle() {
           key="create-objectstore"
           item={ObjectStore}
           authVerb="create"
+          allowedNamespacesHint
           deniedMessage="You don't have permission to create ObjectStores."
         >
           <Button variant="contained" color="primary" onClick={() => launchObjectStoreCreate()}>
