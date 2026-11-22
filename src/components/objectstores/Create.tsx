@@ -1,5 +1,5 @@
 import { Icon } from '@iconify/react';
-import { Activity, K8s } from '@kinvolk/headlamp-plugin/lib';
+import { Activity } from '@kinvolk/headlamp-plugin/lib';
 import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
@@ -12,6 +12,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useMemo, useState } from 'react';
 import { ObjectStore, SecretKeyRef } from '../../resources/objectStore';
+import { NamespaceField } from '../common/NamespaceField';
 import { RequiredLabel } from '../common/RequiredLabel';
 import { SecretKeySelector } from '../common/SecretKeySelector';
 import { YamlPreview } from '../common/YamlPreview';
@@ -83,7 +84,6 @@ function buildObjectStoreManifest(state: ObjectStoreFormState) {
 }
 
 function ObjectStoreCreateForm({ onClose }: { onClose: () => void }) {
-  const [namespaces] = K8s.ResourceClasses.Namespace.useList();
   const [namespace, setNamespace] = useState('');
   const [name, setName] = useState('');
   const [destinationPath, setDestinationPath] = useState('');
@@ -170,23 +170,7 @@ function ObjectStoreCreateForm({ onClose }: { onClose: () => void }) {
 
   return (
     <SectionBox title="Create ObjectStore">
-      <FormControl fullWidth margin="normal">
-        <InputLabel id="objectstore-namespace-label">
-          <RequiredLabel label="Namespace" required />
-        </InputLabel>
-        <Select
-          labelId="objectstore-namespace-label"
-          label={<RequiredLabel label="Namespace" required />}
-          value={namespace}
-          onChange={e => setNamespace(e.target.value)}
-        >
-          {(namespaces ?? []).map(ns => (
-            <MenuItem key={ns.getName()} value={ns.getName()}>
-              {ns.getName()}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      <NamespaceField idPrefix="objectstore" value={namespace} onChange={setNamespace} />
 
       <TextField
         fullWidth

@@ -69,6 +69,7 @@ function backupActions(): ReactNode[] {
       key="create-backup"
       item={Backup}
       authVerb="create"
+      allowedNamespacesHint
       deniedMessage="You don't have permission to create Backups."
     >
       <Button variant="contained" color="primary" onClick={() => launchBackupCreate()}>

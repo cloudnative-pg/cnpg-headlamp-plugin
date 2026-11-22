@@ -111,6 +111,7 @@ function scheduledBackupActions(): ReactNode[] {
       key="create-scheduled-backup"
       item={ScheduledBackup}
       authVerb="create"
+      allowedNamespacesHint
       deniedMessage="You don't have permission to create ScheduledBackups."
     >
       <Button variant="contained" color="primary" onClick={() => launchScheduledBackupCreate()}>

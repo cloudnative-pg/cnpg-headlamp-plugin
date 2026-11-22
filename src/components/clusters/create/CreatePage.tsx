@@ -1,4 +1,4 @@
-import { K8s, Router } from '@kinvolk/headlamp-plugin/lib';
+import { Router } from '@kinvolk/headlamp-plugin/lib';
 import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -22,6 +22,7 @@ import { ObjectStore } from '../../../resources/objectStore';
 import { PluginConfiguration } from '../../../resources/pluginConfiguration';
 import { VolumeSnapshotClass } from '../../../resources/volumeSnapshotClass';
 import { AuthDisabledButton } from '../../common/AuthDisabledButton';
+import { NamespaceField } from '../../common/NamespaceField';
 import { RequiredLabel } from '../../common/RequiredLabel';
 import { StorageSizeClassFields } from '../../common/StorageSizeClassFields';
 import { YamlPreview } from '../../common/YamlPreview';
@@ -207,7 +208,6 @@ function GeneralTab({
   newRowId,
   goToTab,
 }: TabProps & { goToTab: (tab: CreateTab) => void }) {
-  const [namespaces] = K8s.ResourceClasses.Namespace.useList();
   const [objectStores] = ObjectStore.useList({ namespace: state.namespace });
   const [pluginConfigurations] = PluginConfiguration.useList({ namespace: state.namespace });
   const selection = instanceCardSelection(state.instances);
@@ -263,23 +263,12 @@ function GeneralTab({
             }
             sx={{ flex: 1, minWidth: 200 }}
           />
-          <FormControl fullWidth margin="normal" sx={{ flex: 1, minWidth: 200 }}>
-            <InputLabel id="create-cluster-namespace-label">
-              <RequiredLabel label="Namespace" required />
-            </InputLabel>
-            <Select
-              labelId="create-cluster-namespace-label"
-              label={<RequiredLabel label="Namespace" required />}
-              value={state.namespace}
-              onChange={e => update({ namespace: e.target.value })}
-            >
-              {(namespaces ?? []).map(ns => (
-                <MenuItem key={ns.getName()} value={ns.getName()}>
-                  {ns.getName()}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <NamespaceField
+            idPrefix="create-cluster"
+            value={state.namespace}
+            onChange={namespace => update({ namespace })}
+            sx={{ flex: 1, minWidth: 200 }}
+          />
         </Box>
       </SectionBox>
 
@@ -1187,6 +1176,7 @@ export function CreateClusterPage() {
             <AuthDisabledButton
               item={Cluster}
               authVerb="create"
+              allowedNamespacesHint
               deniedMessage="You don't have permission to create Clusters."
             >
               <Button

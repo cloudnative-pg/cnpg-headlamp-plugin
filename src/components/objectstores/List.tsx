@@ -2,7 +2,7 @@ import { Link, ResourceListView } from '@kinvolk/headlamp-plugin/lib/CommonCompo
 import Button from '@mui/material/Button';
 import { ObjectStore } from '../../resources/objectStore';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
-import { BarmanCloudNotInstalled, useBarmanCloudCrdInstalled } from '../common/barmanCloud';
+import { barmanCloudCrdInstalled, BarmanCloudNotInstalled } from '../common/barmanCloud';
 import { ListPageHeader, SummaryStat } from '../common/ListHeader';
 import { launchObjectStoreCreate } from './Create';
 
@@ -25,6 +25,7 @@ function ObjectStoreListTitle() {
           key="create-objectstore"
           item={ObjectStore}
           authVerb="create"
+          allowedNamespacesHint
           deniedMessage="You don't have permission to create ObjectStores."
         >
           <Button variant="contained" color="primary" onClick={() => launchObjectStoreCreate()}>
@@ -39,11 +40,9 @@ function ObjectStoreListTitle() {
 }
 
 export function ObjectStoresList() {
-  const barmanCloudInstalled = useBarmanCloudCrdInstalled();
+  const [, listError] = ObjectStore.useList();
 
-  // false (not null/loading) specifically — ObjectStore.useList() below has nothing to query
-  // once we know for sure the CRD backing it isn't there, so show why instead of an empty table.
-  if (barmanCloudInstalled === false) {
+  if (!barmanCloudCrdInstalled(listError)) {
     return <BarmanCloudNotInstalled title="ObjectStores" />;
   }
 

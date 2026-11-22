@@ -1,4 +1,4 @@
-import { K8s, Router } from '@kinvolk/headlamp-plugin/lib';
+import { Router } from '@kinvolk/headlamp-plugin/lib';
 import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Alert from '@mui/material/Alert';
 import AlertTitle from '@mui/material/AlertTitle';
@@ -7,21 +7,16 @@ import { useHistory } from 'react-router-dom';
 
 const { createRouteURL } = Router;
 
-// Full name of the Barman Cloud plugin's ObjectStore CRD, as it appears in
-// CustomResourceDefinition.metadata.name. Kept in one place since both this check and
-// OperatorStatus's CRD_GROUPS list need to recognize the same CRD.
-const BARMAN_CLOUD_OBJECTSTORE_CRD = 'objectstores.barmancloud.cnpg.io';
-
-/** Whether the Barman Cloud plugin's ObjectStore CRD is installed on the cluster. `null` while
- *  the CustomResourceDefinition list is still loading — callers should treat that the same as
- *  "assume installed" so pages don't flash a false "not installed" state before the check
- *  resolves. */
-export function useBarmanCloudCrdInstalled(): boolean | null {
-  const [crds] = K8s.ResourceClasses.CustomResourceDefinition.useList();
-  if (crds === null) {
-    return null;
-  }
-  return crds.some(crd => crd.getName() === BARMAN_CLOUD_OBJECTSTORE_CRD);
+/** Whether the Barman Cloud plugin's ObjectStore CRD is installed on the cluster, inferred from
+ *  the error (if any) of ObjectStore's own list call rather than a separate cluster-wide
+ *  CustomResourceDefinition list. A CustomResourceDefinition list needs its own cluster-scoped
+ *  RBAC, which namespace-scoped users (e.g. bound only via a Role in one namespace) don't have —
+ *  that denial used to resolve to an empty CRD list and get misread as "not installed",
+ *  hiding ObjectStores such a user otherwise has every right to see. A 404 here means the
+ *  apiserver doesn't know the resource type at all (CRD genuinely missing); any other error
+ *  (e.g. 403 from namespace-scoped RBAC) or no error means the CRD is there. */
+export function barmanCloudCrdInstalled(listError: { status?: number } | null): boolean {
+  return listError?.status !== 404;
 }
 
 /** Shown by the ObjectStores views instead of an empty/broken list when the Barman Cloud

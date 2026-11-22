@@ -1,16 +1,13 @@
 import { Icon } from '@iconify/react';
-import { Activity, K8s } from '@kinvolk/headlamp-plugin/lib';
+import { Activity } from '@kinvolk/headlamp-plugin/lib';
 import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Button from '@mui/material/Button';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useMemo, useState } from 'react';
 import { ImageCatalog } from '../../resources/imageCatalog';
 import { CatalogImageRow, CatalogImagesEditor } from '../common/CatalogImagesEditor';
+import { NamespaceField } from '../common/NamespaceField';
 import { RequiredLabel } from '../common/RequiredLabel';
 import { YamlPreview } from '../common/YamlPreview';
 
@@ -32,7 +29,6 @@ function buildImageCatalogManifest(state: ImageCatalogFormState) {
 }
 
 function ImageCatalogCreateForm({ onClose }: { onClose: () => void }) {
-  const [namespaces] = K8s.ResourceClasses.Namespace.useList();
   const [namespace, setNamespace] = useState('');
   const [name, setName] = useState('');
   const [images, setImages] = useState<CatalogImageRow[]>([
@@ -70,23 +66,7 @@ function ImageCatalogCreateForm({ onClose }: { onClose: () => void }) {
 
   return (
     <SectionBox title="Create ImageCatalog">
-      <FormControl fullWidth margin="normal">
-        <InputLabel id="imagecatalog-namespace-label">
-          <RequiredLabel label="Namespace" required />
-        </InputLabel>
-        <Select
-          labelId="imagecatalog-namespace-label"
-          label={<RequiredLabel label="Namespace" required />}
-          value={namespace}
-          onChange={e => setNamespace(e.target.value)}
-        >
-          {(namespaces ?? []).map(ns => (
-            <MenuItem key={ns.getName()} value={ns.getName()}>
-              {ns.getName()}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      <NamespaceField idPrefix="imagecatalog" value={namespace} onChange={setNamespace} />
 
       <TextField
         fullWidth

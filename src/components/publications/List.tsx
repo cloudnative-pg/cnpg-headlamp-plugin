@@ -90,6 +90,7 @@ function publicationActions(): ReactNode[] {
       key="create-publication"
       item={Publication}
       authVerb="create"
+      allowedNamespacesHint
       deniedMessage="You don't have permission to create Publications."
     >
       <Button variant="contained" color="primary" onClick={() => launchPublicationCreate()}>

@@ -32,6 +32,7 @@ function RestoreMenu() {
       <AuthDisabledButton
         item={Cluster}
         authVerb="create"
+        allowedNamespacesHint
         deniedMessage="You don't have permission to restore Clusters."
       >
         <Button
@@ -185,6 +186,7 @@ export function ClustersList() {
                 key="create-cluster"
                 item={Cluster}
                 authVerb="create"
+                allowedNamespacesHint
                 deniedMessage="You don't have permission to create Clusters."
               >
                 <Button

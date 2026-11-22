@@ -24,6 +24,7 @@ function ImageCatalogListTitle() {
           key="create-imagecatalog"
           item={ImageCatalog}
           authVerb="create"
+          allowedNamespacesHint
           deniedMessage="You don't have permission to create ImageCatalogs."
         >
           <Button variant="contained" color="primary" onClick={() => launchImageCatalogCreate()}>
