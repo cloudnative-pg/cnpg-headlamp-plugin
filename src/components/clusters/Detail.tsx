@@ -3,11 +3,9 @@ import { K8s, Router } from '@kinvolk/headlamp-plugin/lib';
 import {
   ActionButton,
   AuthVisible,
-  ConditionsTable,
   DeleteButton,
   EditButton,
   Loader,
-  NameValueTable,
   ResourceLink,
   SectionBox,
   SectionHeader,
@@ -76,6 +74,7 @@ import { launchConnectActivity } from './connect';
 import { FenceAction } from './fence';
 import { HibernateDetailAction } from './hibernate';
 import { LogsTab } from './logs/LogsTab';
+import { PostgresqlConfigSection } from './postgresqlConfig/PostgresqlConfigSection';
 import { ScaleAction } from './scale';
 import { SwitchoverAction } from './switchover';
 
@@ -83,7 +82,6 @@ const { createRouteURL } = Router;
 
 type Pvc = InstanceType<typeof K8s.ResourceClasses.PersistentVolumeClaim>;
 type KubeEvent = InstanceType<typeof Event>;
-type Lease = InstanceType<typeof K8s.ResourceClasses.Lease>;
 
 function sortByName<T extends { getName(): string }>(items: T[] | null | undefined): T[] {
   return [...(items ?? [])].sort((a, b) => a.getName().localeCompare(b.getName()));
@@ -899,53 +897,71 @@ function BackupStatusCard({ cluster }: { cluster: Cluster }) {
   );
 }
 
-function ClusterInfoCard({ cluster, lease }: { cluster: Cluster; lease: Lease | null }) {
+function ClusterInfoCard({ cluster }: { cluster: Cluster }) {
   const labels = cluster.jsonData.metadata?.labels ?? {};
   const annotations = cluster.jsonData.metadata?.annotations ?? {};
-  const created = cluster.jsonData.metadata?.creationTimestamp;
-  const spec = lease?.spec as
-    | (Lease['spec'] & { acquireTime?: string; holderIdentity?: string })
-    | undefined;
+  // CNPG maintains at most one FailoverQuorum per Cluster, in the same namespace and under the
+  // same name, and deletes it as soon as quorum-based failover is switched off. So a 404 here is
+  // the ordinary "not enabled" case, not an error: the quorum rows are simply left out.
+  const [quorum] = FailoverQuorum.useGet(cluster.getName(), cluster.getNamespace(), {
+    cluster: cluster.cluster,
+  });
+  const synchronous = cluster.spec.postgresql?.synchronous;
+
+  // Name, namespace, creation date, primary, instances and storage are already in the page
+  // header and summary strip, so they aren't repeated here.
+  const rows: { name: ReactNode; value: ReactNode }[] = [
+    {
+      name: 'Labels',
+      value:
+        Object.keys(labels).length > 0
+          ? Object.entries(labels)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join(', ')
+          : '-',
+    },
+    {
+      name: 'Annotations',
+      value:
+        Object.keys(annotations).length > 0
+          ? Object.entries(annotations)
+              .slice(0, 3)
+              .map(([k]) => k)
+              .join(', ') + (Object.keys(annotations).length > 3 ? '…' : '')
+          : '-',
+    },
+    { name: 'PostgreSQL Image', value: cluster.image ?? cluster.spec.imageName ?? '-' },
+    {
+      name: 'Image Catalog',
+      value: cluster.imageCatalogRef
+        ? `${cluster.imageCatalogRef.kind}/${cluster.imageCatalogRef.name} (major ${cluster.imageCatalogRef.major})`
+        : '-',
+    },
+    {
+      name: 'Synchronous Replication',
+      value: cluster.hasSynchronousReplication
+        ? `On (${cluster.syncReplicasRequired} required, method ${synchronous?.method ?? '-'})`
+        : cluster.instances > 1
+        ? 'Off — multiple instances without synchronous replication risk data loss on failover'
+        : 'N/A (single instance)',
+    },
+  ];
+  if (quorum) {
+    const standbyNames = quorum.standbyNames;
+    rows.push(
+      { name: 'Quorum Method', value: quorum.method ?? '-' },
+      { name: 'Sync Standbys Required', value: quorum.standbyNumber ?? '-' },
+      { name: 'Reporting Primary', value: quorum.primary ?? '-' },
+      {
+        name: 'Candidate Standbys',
+        value: standbyNames.length > 0 ? standbyNames.join(', ') : '-',
+      }
+    );
+  }
 
   return (
     <SectionBox title="Cluster Information">
-      <InfoTable
-        rows={[
-          { name: 'Name', value: cluster.getName() },
-          { name: 'Namespace', value: cluster.getNamespace() },
-          {
-            name: 'Labels',
-            value:
-              Object.keys(labels).length > 0
-                ? Object.entries(labels)
-                    .map(([k, v]) => `${k}: ${v}`)
-                    .join(', ')
-                : '-',
-          },
-          {
-            name: 'Annotations',
-            value:
-              Object.keys(annotations).length > 0
-                ? Object.entries(annotations)
-                    .slice(0, 3)
-                    .map(([k]) => k)
-                    .join(', ') + (Object.keys(annotations).length > 3 ? '…' : '')
-                : '-',
-          },
-          { name: 'PostgreSQL Image', value: cluster.image ?? cluster.spec.imageName ?? '-' },
-          { name: 'Timeline', value: cluster.timelineID ?? '-' },
-          { name: 'Primary', value: cluster.currentPrimary ?? '-' },
-          {
-            name: 'Lease Holder',
-            value: spec?.holderIdentity ?? '-',
-          },
-          { name: 'Created', value: created ? localeDate(created) : cluster.getAge() },
-          {
-            name: 'Last Updated',
-            value: spec?.renewTime ? localeDate(spec.renewTime) : '-',
-          },
-        ]}
-      />
+      <InfoTable rows={rows} />
     </SectionBox>
   );
 }
@@ -1024,7 +1040,7 @@ function RecentEventsCard({ cluster, onViewAll }: { cluster: Cluster; onViewAll?
   );
 }
 
-function OverviewTab({ cluster, lease }: { cluster: Cluster; lease: Lease | null }) {
+function OverviewTab({ cluster }: { cluster: Cluster }) {
   return (
     <Grid container spacing={2}>
       <Grid item xs={12} md={6}>
@@ -1034,7 +1050,7 @@ function OverviewTab({ cluster, lease }: { cluster: Cluster; lease: Lease | null
         <PerformanceOverview cluster={cluster} />
       </Grid>
       <Grid item xs={12} md={6}>
-        <ClusterInfoCard cluster={cluster} lease={lease} />
+        <ClusterInfoCard cluster={cluster} />
       </Grid>
       <Grid item xs={12} md={6}>
         <BackupStatusCard cluster={cluster} />
@@ -1653,78 +1669,6 @@ function PoolersSection({ cluster }: { cluster: Cluster }) {
   );
 }
 
-function FailoverQuorumSection({ cluster }: { cluster: Cluster }) {
-  // CNPG maintains at most one FailoverQuorum per Cluster, in the same namespace and under the
-  // same name, and deletes it as soon as quorum-based failover is switched off. So a 404 here is
-  // the ordinary "not enabled" case, not an error worth showing — render nothing rather than
-  // putting an empty section on every cluster page.
-  const [quorum] = FailoverQuorum.useGet(cluster.getName(), cluster.getNamespace(), {
-    cluster: cluster.cluster,
-  });
-
-  if (!quorum) {
-    return null;
-  }
-
-  const standbyNames = quorum.standbyNames;
-
-  return (
-    <SectionBox title="Failover Quorum">
-      <NameValueTable
-        rows={[
-          {
-            name: 'Method',
-            value: quorum.method ?? '-',
-          },
-          {
-            name: 'Sync Standbys Required',
-            value: quorum.standbyNumber ?? '-',
-          },
-          {
-            name: 'Reporting Primary',
-            value: quorum.primary ?? '-',
-          },
-          {
-            name: 'Candidate Standbys',
-            value: standbyNames.length > 0 ? standbyNames.join(', ') : '-',
-          },
-        ]}
-      />
-    </SectionBox>
-  );
-}
-
-// CNPG maintains exactly one Lease per Cluster, same name and namespace, used for leader election
-// among instances — so a missing Lease (e.g. right after cluster creation) is a transient,
-// ordinary state, not an error worth showing (renders as '-' rather than nothing).
-function leaseValue(lease: Lease | null) {
-  if (!lease) {
-    return '-';
-  }
-
-  // The API also sets spec.acquireTime, which the SDK's LeaseSpec type omits.
-  const spec = lease.spec as typeof lease.spec & { acquireTime?: string };
-
-  return (
-    <Tooltip
-      title={
-        <>
-          Acquired: {spec.acquireTime ? localeDate(spec.acquireTime) : '-'}
-          <br />
-          Duration: {spec.leaseDurationSeconds}s<br />
-          Transitions: {spec.leaseTransitions}
-        </>
-      }
-    >
-      <span>
-        {spec.holderIdentity
-          ? `${spec.holderIdentity} (renewed ${spec.renewTime ? localeDate(spec.renewTime) : '-'})`
-          : '-'}
-      </span>
-    </Tooltip>
-  );
-}
-
 function InstancesTab({ cluster }: { cluster: Cluster }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1756,6 +1700,11 @@ function BackupsTab({ cluster }: { cluster: Cluster }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <SectionBox title="Backups">
+        {cluster.volumeSnapshotClassName && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Volume snapshot class: <strong>{cluster.volumeSnapshotClassName}</strong>
+          </Typography>
+        )}
         <SimpleTable
           columns={[
             { label: 'Name', getter: (backup: Backup) => backup.getName() },
@@ -1813,56 +1762,10 @@ function BackupsTab({ cluster }: { cluster: Cluster }) {
   );
 }
 
-function ConfigurationTab({ cluster, lease }: { cluster: Cluster; lease: Lease | null }) {
-  const synchronous = cluster.spec.postgresql?.synchronous;
+function ConfigurationTab({ cluster }: { cluster: Cluster }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <SectionBox title="Configuration">
-        <NameValueTable
-          rows={[
-            {
-              name: 'Instances',
-              value: `${cluster.readyInstances} ready / ${cluster.instances} total`,
-            },
-            { name: 'PostgreSQL Image', value: cluster.image ?? cluster.spec.imageName ?? '-' },
-            {
-              name: 'Image Catalog',
-              value: cluster.imageCatalogRef
-                ? `${cluster.imageCatalogRef.kind}/${cluster.imageCatalogRef.name} (major ${cluster.imageCatalogRef.major})`
-                : '-',
-            },
-            { name: 'Primary', value: cluster.primaryLabel },
-            { name: 'Lease', value: leaseValue(lease) },
-            { name: 'Storage Size', value: cluster.spec.storage?.size ?? '-' },
-            { name: 'Storage Class', value: cluster.spec.storage?.storageClass ?? '-' },
-            { name: 'WAL Storage', value: cluster.spec.walStorage?.size ?? '-' },
-            {
-              name: 'Synchronous Replication',
-              value: cluster.hasSynchronousReplication
-                ? `On (${cluster.syncReplicasRequired} required, method ${
-                    synchronous?.method ?? '-'
-                  })`
-                : cluster.instances > 1
-                ? 'Off — multiple instances without synchronous replication risk data loss on failover'
-                : 'N/A (single instance)',
-            },
-            {
-              name: 'Bootstrap Recovery Source',
-              value: cluster.spec.bootstrap?.recovery?.source ?? '-',
-            },
-            {
-              name: 'Volume Snapshot Class',
-              value: cluster.volumeSnapshotClassName ?? '-',
-            },
-            { name: 'System ID', value: cluster.systemID ?? '-' },
-            { name: 'Timeline', value: cluster.timelineID ?? '-' },
-          ]}
-        />
-      </SectionBox>
-      <FailoverQuorumSection cluster={cluster} />
-      <SectionBox title="Conditions">
-        <ConditionsTable resource={cluster.jsonData} />
-      </SectionBox>
+      <PostgresqlConfigSection cluster={cluster} />
     </Box>
   );
 }
@@ -1982,9 +1885,6 @@ export function ClusterDetail() {
   const [cluster, clusterError] = Cluster.useGet(name, namespace, {
     cluster: selectedCluster ?? undefined,
   });
-  const [lease] = K8s.ResourceClasses.Lease.useGet(name, namespace, {
-    cluster: selectedCluster ?? undefined,
-  });
 
   if (clusterError) {
     return (
@@ -2066,18 +1966,18 @@ export function ClusterDetail() {
             }
           />
           <Tab label="Storage" />
-          <Tab label="Configuration" />
+          <Tab label="PG Configuration" />
           <Tab label="Events" />
         </Tabs>
       </Box>
 
-      {activeTab === 0 && <OverviewTab cluster={cluster} lease={lease} />}
+      {activeTab === 0 && <OverviewTab cluster={cluster} />}
       {activeTab === 1 && <InstancesTab cluster={cluster} />}
       {activeTab === 2 && <MetricsSection cluster={cluster} />}
       {activeTab === 3 && <LogsTab cluster={cluster} />}
       {activeTab === 4 && <BackupsTab cluster={cluster} />}
       {activeTab === 5 && <PvcsSection cluster={cluster} />}
-      {activeTab === 6 && <ConfigurationTab cluster={cluster} lease={lease} />}
+      {activeTab === 6 && <ConfigurationTab cluster={cluster} />}
       {activeTab === 7 && <RecentEventsCard cluster={cluster} />}
     </Box>
   );
