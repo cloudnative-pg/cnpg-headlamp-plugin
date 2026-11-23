@@ -35,9 +35,8 @@ export function useLogColors(): LogColors {
     },
     role: { primary: ok, replica: pick('#1976d2', '#64b5f6') },
     category: {
-      // Lime: clear of green (normal/primary), red/pink (errors) and amber (warnings), and quiet
-      // enough for the busiest category.
       connections: pick('#9e9d24', '#d4e157'),
+      internal: pick('#78909c', '#90a4ae'),
       statements: pick('#fb8c00', '#ffb74d'),
       wal: pick('#1e88e5', '#64b5f6'),
       autovacuum: pick('#00acc1', '#4dd0e1'),

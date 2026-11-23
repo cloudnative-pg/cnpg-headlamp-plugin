@@ -4,11 +4,13 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
+import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import { useDeferredValue, useMemo, useState } from 'react';
@@ -97,6 +99,8 @@ export function LogsTab({ cluster }: { cluster: Cluster }) {
   const [sortDirection, setSortDirection] = useState<'newest' | 'oldest'>('newest');
   const [categories, setCategories] = useState<ReadonlySet<LogCategory>>(new Set());
   const [container, setContainer] = useState(POSTGRES_CONTAINER);
+  // A view preference rather than a filter: "Clear filters" leaves it alone.
+  const [hideInternal, setHideInternal] = useState(true);
 
   // Like the per-pod log viewer: every container, init containers first. Falls back to postgres
   // if the chosen one goes away.
@@ -138,9 +142,18 @@ export function LogsTab({ cluster }: { cluster: Cluster }) {
     [logs.entries, range, live, now]
   );
   const podSet = useMemo(() => new Set(selectedPods), [selectedPods]);
-  const scoped = useMemo(
+  const inWindow = useMemo(
     () => filterEntries(logs.entries, { from: window.from, to: window.to, pods: podSet }),
     [logs.entries, window, podSet]
+  );
+  const internalCount = useMemo(
+    () => inWindow.filter(entry => entry.category === 'internal').length,
+    [inWindow]
+  );
+  // Hiding applies to the charts and tiles as well, so every view agrees with the stream.
+  const scoped = useMemo(
+    () => (hideInternal ? inWindow.filter(entry => entry.category !== 'internal') : inWindow),
+    [inWindow, hideInternal]
   );
   // Only the levels that exist, like the per-pod viewer; the chosen one is always kept.
   const severityOptions = useMemo(() => {
@@ -167,6 +180,7 @@ export function LogsTab({ cluster }: { cluster: Cluster }) {
   };
   const resetKey = JSON.stringify([
     activeContainer,
+    hideInternal,
     selectedPods,
     range,
     severity,
@@ -197,7 +211,11 @@ export function LogsTab({ cluster }: { cluster: Cluster }) {
 
   const loading = live && logs.received.length === 0 && logs.stopped.length < instances.length;
   let emptyMessage: string;
-  if (logs.entries.length > 0) {
+  if (hideInternal && internalCount > 0 && scoped.length === 0) {
+    emptyMessage = `Only CloudNativePG’s own connection lines are in this window (${formatCount(
+      internalCount
+    )} hidden). Switch off “Hide internal” to see them.`;
+  } else if (logs.entries.length > 0) {
     emptyMessage = 'No log lines match the current filters.';
   } else if (loading || pods === null) {
     emptyMessage = `Loading logs from ${instances.length || 'the'} instance${
@@ -322,6 +340,30 @@ export function LogsTab({ cluster }: { cluster: Cluster }) {
           <MenuItem value="newest">Newest first</MenuItem>
           <MenuItem value="oldest">Oldest first</MenuItem>
         </Select>
+        {isPostgres && internalCount > 0 && (
+          <Tooltip title="CloudNativePG’s own local sessions (instance manager, readiness probe) log a connect and a disconnect line every few seconds when log_connections is on. They stay in the logs; this only hides them here.">
+            <FormControlLabel
+              sx={{ mx: 0.5 }}
+              control={
+                <Switch
+                  size="small"
+                  checked={hideInternal}
+                  onChange={event => {
+                    setHideInternal(event.target.checked);
+                    if (event.target.checked) {
+                      setCategories(previous => {
+                        const next = new Set(previous);
+                        next.delete('internal');
+                        return next;
+                      });
+                    }
+                  }}
+                />
+              }
+              label={`Hide internal (${formatCount(internalCount)})`}
+            />
+          </Tooltip>
+        )}
         <Button
           size="small"
           variant={live ? 'contained' : 'outlined'}

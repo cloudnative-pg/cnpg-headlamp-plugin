@@ -9,13 +9,11 @@ import { useMemo, useState } from 'react';
 import {
   bucketCounts,
   bucketize,
-  halfTrend,
-  isClientConnection,
   isErrorOrFatal,
+  isFailedLogin,
   isLockWait,
   isSlowStatement,
   PostgresLogEntry,
-  Trend,
 } from '../../../resources/postgresLog';
 import { InstanceChip } from './InstanceChip';
 import {
@@ -71,57 +69,17 @@ function Sparkline({ series, color }: { series: number[]; color: string }) {
   );
 }
 
-function TrendLabel({ trend, increaseIsBad }: { trend: Trend; increaseIsBad: boolean }) {
-  const colors = useLogColors();
-  const { first, second, percent } = trend;
-  if (first === 0 && second === 0) {
-    return null;
-  }
-  const rising = second > first;
-  const falling = second < first;
-  const text =
-    percent === null
-      ? 'new'
-      : `${percent > 0 ? '+' : percent < 0 ? '−' : ''}${Math.abs(Math.round(percent))}%`;
-  const color =
-    increaseIsBad && rising
-      ? colors.error
-      : increaseIsBad && falling
-      ? colors.ok
-      : 'text.secondary';
-  return (
-    <Tooltip
-      title={`${formatCount(first)} in the first half of the window, ${formatCount(
-        second
-      )} in the second`}
-    >
-      <Typography
-        component="span"
-        variant="caption"
-        sx={{ fontWeight: 600, color, whiteSpace: 'nowrap' }}
-      >
-        {rising ? '▲ ' : falling ? '▼ ' : ''}
-        {text}
-      </Typography>
-    </Tooltip>
-  );
-}
-
 function InsightTile({
   title,
   total,
   series,
-  trend,
   statusColor,
-  increaseIsBad,
   description,
 }: {
   title: string;
   total: number;
   series: number[];
-  trend: Trend;
   statusColor: string;
-  increaseIsBad: boolean;
   description: string;
 }) {
   return (
@@ -154,12 +112,9 @@ function InsightTile({
         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
           {title}
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 0.25 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-            {formatCount(total)}
-          </Typography>
-          <TrendLabel trend={trend} increaseIsBad={increaseIsBad} />
-        </Box>
+        <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2, mt: 0.25 }}>
+          {formatCount(total)}
+        </Typography>
         <Box sx={{ mt: 1 }}>
           <Sparkline series={series} color={statusColor} />
         </Box>
@@ -184,11 +139,10 @@ export function InsightTiles({
       return {
         series,
         total: series.reduce((sum, value) => sum + value, 0),
-        trend: halfTrend(series),
       };
     };
     return {
-      connections: build(isClientConnection),
+      failedLogins: build(isFailedLogin),
       slow: build(isSlowStatement),
       locks: build(isLockWait),
       errors: build(isErrorOrFatal),
@@ -203,11 +157,10 @@ export function InsightTiles({
       <Grid container spacing={2}>
         <Grid item xs={12} sm={6} md={3}>
           <InsightTile
-            title="Connections"
-            description="Client sessions accepted (“connection authorized”). Requires log_connections."
-            {...tiles.connections}
-            statusColor={colors.ok}
-            increaseIsBad={false}
+            title="Failed logins"
+            description="Connections that were refused: wrong password, unknown role or database, or no pg_hba.conf entry. Logged even when log_connections is off."
+            {...tiles.failedLogins}
+            statusColor={tiles.failedLogins.total > 0 ? colors.error : colors.ok}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -216,7 +169,6 @@ export function InsightTiles({
             description="Statements slower than log_min_duration_statement."
             {...tiles.slow}
             statusColor={tiles.slow.total > 0 ? colors.warning : colors.ok}
-            increaseIsBad
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -225,7 +177,6 @@ export function InsightTiles({
             description="Sessions that waited longer than deadlock_timeout for a lock, plus detected deadlocks. Requires log_lock_waits."
             {...tiles.locks}
             statusColor={tiles.locks.total > 0 ? colors.warning : colors.ok}
-            increaseIsBad
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -234,7 +185,6 @@ export function InsightTiles({
             description="Log entries with severity ERROR, FATAL or PANIC."
             {...tiles.errors}
             statusColor={tiles.errors.total > 0 ? colors.error : colors.ok}
-            increaseIsBad
           />
         </Grid>
       </Grid>

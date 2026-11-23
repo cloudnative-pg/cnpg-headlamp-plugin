@@ -13,6 +13,7 @@ export const POSTGRES_CONTAINER = 'postgres';
 
 export type LogCategory =
   | 'connections'
+  | 'internal'
   | 'statements'
   | 'wal'
   | 'autovacuum'
@@ -28,6 +29,12 @@ export const LOG_CATEGORIES: { id: LogCategory; label: string; description: stri
     id: 'connections',
     label: 'Connections',
     description: 'Connection received/authorized, disconnections, failed logins, killed sessions',
+  },
+  {
+    id: 'internal',
+    label: 'Internal',
+    description:
+      'Connect and disconnect lines of CloudNativePG’s own local sessions (instance manager, readiness probe)',
   },
   {
     id: 'statements',
@@ -147,6 +154,16 @@ const LOCK_MESSAGE =
   /^process \d+ (still waiting for|acquired \w+ on|detected deadlock)|^deadlock detected|due to lock timeout$/;
 const CONNECTION_MESSAGE =
   /^(replication )?connection (received|authorized|authenticated)|^disconnection:|^terminating connection|^no pg_hba\.conf entry|^could not accept SSL|^[A-Za-z]+ authentication failed/;
+// The lifecycle of a session that got in; failures and kills are never internal noise.
+const SESSION_LIFECYCLE_MESSAGE = /^connection (received|authenticated|authorized)|^disconnection:/;
+// Local-socket sessions opened by CloudNativePG itself: the instance manager, its metrics
+// exporter and the readiness probe.
+const LOCAL_CLIENT = '[local]';
+const INTERNAL_APPLICATIONS: ReadonlySet<string> = new Set([
+  'cnpg-instance-manager',
+  'cnpg_metrics_exporter',
+  'pg_isready',
+]);
 // FATAL only: at ERROR level the same wording comes from DDL in an established session
 // (e.g. DROP DATABASE nope).
 const CONNECTION_REJECTED_MESSAGE = /^(database|role) ".*" does not exist/;
@@ -162,8 +179,18 @@ export function categorizeRecord(input: {
   sqlState?: string;
   backendType?: string;
   user?: string;
+  client?: string;
+  applicationName?: string;
 }): LogCategory {
-  const { message, severity, sqlState = '', backendType = '', user = '' } = input;
+  const {
+    message,
+    severity,
+    sqlState = '',
+    backendType = '',
+    user = '',
+    client = '',
+    applicationName = '',
+  } = input;
   const rank = severityRank(severity);
 
   // Strong signals first: who emitted the line says more than its wording.
@@ -184,6 +211,13 @@ export function categorizeRecord(input: {
   }
   if (sqlState.startsWith('23')) {
     return 'constraints';
+  }
+  if (
+    client === LOCAL_CLIENT &&
+    INTERNAL_APPLICATIONS.has(applicationName) &&
+    SESSION_LIFECYCLE_MESSAGE.test(message)
+  ) {
+    return 'internal';
   }
   if (
     CONNECTION_MESSAGE.test(message) ||
@@ -265,15 +299,48 @@ const FIELD_LABELS: [string, string][] = [
   ['query_id', 'query_id'],
 ];
 
+const AUTHORIZED_APPLICATION = /^connection authorized:.* application_name=(\S+)/;
+
+interface SessionIdentity {
+  user?: string;
+  application?: string;
+}
+
+/**
+ * Postgres only fills user and application_name in on some of a session's lines ("connection
+ * received" has neither; the application name is in the "connection authorized" text and the
+ * disconnection record), so they are looked up per session to place the whole session, e.g. its
+ * "connection received" line, alongside the rest.
+ */
+function identifySessions(
+  lines: { message: string; record: Record<string, unknown> }[]
+): Map<string, SessionIdentity> {
+  const sessions = new Map<string, SessionIdentity>();
+  for (const { message, record } of lines) {
+    const id = str(record.session_id);
+    if (!id) {
+      continue;
+    }
+    const identity = sessions.get(id) ?? {};
+    identity.user ??= str(record.user_name);
+    identity.application ??=
+      str(record.application_name) ?? AUTHORIZED_APPLICATION.exec(message)?.[1];
+    sessions.set(id, identity);
+  }
+  return sessions;
+}
+
 /** Parses one pod's raw log chunks into Postgres log events, dropping non-record lines. */
 export function toPostgresEntries(pod: string, rawLines: string[]): PostgresLogEntry[] {
   const entries: PostgresLogEntry[] = [];
-  for (const line of parseCnpgLogLines(rawLines)) {
+  const records = parseCnpgLogLines(rawLines).flatMap(line =>
+    line.record && line.logger === 'postgres' ? [{ ...line, record: line.record }] : []
+  );
+  const sessions = identifySessions(records);
+  for (const line of records) {
     const record = line.record;
-    if (!record || line.logger !== 'postgres') {
-      continue;
-    }
     const get = (key: string) => str(record[key]);
+    const session = sessions.get(get('session_id') ?? '');
     const time = parsePostgresLogTime(record.log_time, line.ts);
     const user = get('user_name');
     const backendType = get('backend_type');
@@ -299,7 +366,9 @@ export function toPostgresEntries(pod: string, rawLines: string[]): PostgresLogE
         severity: line.severity,
         sqlState,
         backendType,
-        user,
+        user: user ?? session?.user,
+        client: get('connection_from'),
+        applicationName: get('application_name') ?? session?.application,
       }),
       message: line.message,
       pid: get('process_id') ?? '',
@@ -555,25 +624,14 @@ export function bucketCounts(
   return series;
 }
 
-export interface Trend {
-  first: number;
-  second: number;
-  /** Percent change from the first half of the window to the second; null when first is 0. */
-  percent: number | null;
-}
-
-/** Compares the second half of a series with the first half. */
-export function halfTrend(series: readonly number[]): Trend {
-  const mid = Math.floor(series.length / 2);
-  const sum = (values: readonly number[]) => values.reduce((total, v) => total + v, 0);
-  const first = sum(series.slice(0, mid));
-  const second = sum(series.slice(mid));
-  return { first, second, percent: first === 0 ? null : ((second - first) * 100) / first };
-}
-
-/** A client session was accepted (replication connections are counted under Standby). */
-export const isClientConnection = (entry: PostgresLogEntry): boolean =>
-  entry.category === 'connections' && entry.message.startsWith('connection authorized');
+/**
+ * A connection that was refused: wrong password, unknown role or database, or no pg_hba.conf
+ * entry (FATAL, SQLSTATE 28xxx or 3D000), from any client, replicas included. Logged even with
+ * log_connections off; a session killed by an administrator (57P01) is not one.
+ */
+export const isFailedLogin = (entry: PostgresLogEntry): boolean =>
+  severityRank(entry.severity) >= 5 &&
+  (!!entry.sqlState?.startsWith('28') || entry.sqlState === '3D000');
 
 /** A statement that ran longer than log_min_duration_statement. */
 export const isSlowStatement = (entry: PostgresLogEntry): boolean =>

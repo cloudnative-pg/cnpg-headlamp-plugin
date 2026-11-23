@@ -6,10 +6,9 @@ import {
   countByCategory,
   distinctSeverities,
   filterEntries,
-  halfTrend,
   instanceContainers,
-  isClientConnection,
   isErrorOrFatal,
+  isFailedLogin,
   isLockWait,
   isSlowStatement,
   LogCategory,
@@ -191,6 +190,62 @@ describe('categorizeRecord', () => {
       'standby',
     ],
     [
+      'instance manager session',
+      {
+        message: 'connection authorized: user=postgres database=app application_name=x',
+        severity: 'LOG',
+        client: '[local]',
+        applicationName: 'cnpg-instance-manager',
+      },
+      'internal',
+    ],
+    [
+      'readiness probe disconnect',
+      {
+        message: 'disconnection: session time: 0:00:00.010 user=postgres database=postgres',
+        severity: 'LOG',
+        client: '[local]',
+        applicationName: 'pg_isready',
+      },
+      'internal',
+    ],
+    [
+      'local session of someone else (psql)',
+      {
+        message: 'connection authorized: user=postgres database=app application_name=psql',
+        severity: 'LOG',
+        client: '[local]',
+        applicationName: 'psql',
+      },
+      'connections',
+    ],
+    [
+      'local session whose application is not known yet',
+      { message: 'connection received: host=[local]', severity: 'LOG', client: '[local]' },
+      'connections',
+    ],
+    [
+      'remote session that borrows an internal application name',
+      {
+        message: 'connection authorized: user=app database=app application_name=pg_isready',
+        severity: 'LOG',
+        client: '10.244.0.9:41234',
+        applicationName: 'pg_isready',
+      },
+      'connections',
+    ],
+    [
+      'failed local login of an internal application',
+      {
+        message: 'password authentication failed for user "postgres"',
+        severity: 'FATAL',
+        sqlState: '28P01',
+        client: '[local]',
+        applicationName: 'cnpg-instance-manager',
+      },
+      'connections',
+    ],
+    [
       'permission denied',
       { message: 'permission denied for table audit_log', severity: 'ERROR', sqlState: '42501' },
       'errors',
@@ -348,6 +403,93 @@ describe('toPostgresEntries', () => {
     expect(toPostgresEntries('demo1-2', lines)[0].key).not.toBe(first[0].key);
   });
 
+  describe('local sessions', () => {
+    // application_name is only on the "authorized" text and the disconnection record, never on
+    // "received" or "authenticated": the session id ties the four lines together.
+    const session = (id: string, application: string) => {
+      const base = { session_id: id, connection_from: '[local]', user_name: 'postgres' };
+      return [
+        record({
+          ...base,
+          user_name: '',
+          session_line_num: '1',
+          message: 'connection received: host=[local]',
+        }),
+        record({
+          ...base,
+          session_line_num: '2',
+          message: 'connection authenticated: identity="postgres" method=peer',
+        }),
+        record({
+          ...base,
+          session_line_num: '3',
+          message: `connection authorized: user=postgres database=app application_name=${application}`,
+        }),
+        record({
+          ...base,
+          session_line_num: '4',
+          application_name: application,
+          message: 'disconnection: session time: 0:00:00.010 user=postgres database=app',
+        }),
+      ];
+    };
+
+    it('files every line of a CloudNativePG session under Internal', () => {
+      const entries = toPostgresEntries('demo1-1', session('6b048c19.2e', 'cnpg-instance-manager'));
+      expect(entries.map(e => e.category)).toEqual([
+        'internal',
+        'internal',
+        'internal',
+        'internal',
+      ]);
+    });
+
+    it('keeps a human psql session under Connections', () => {
+      const entries = toPostgresEntries('demo1-1', session('6b048c19.30', 'psql'));
+      expect(entries.map(e => e.category)).toEqual([
+        'connections',
+        'connections',
+        'connections',
+        'connections',
+      ]);
+    });
+
+    it('keeps sessions apart by session id', () => {
+      const entries = toPostgresEntries('demo1-1', [
+        ...session('6b048c19.2e', 'pg_isready'),
+        ...session('6b048c19.30', 'psql'),
+      ]);
+      expect(entries.map(e => e.category)).toEqual([
+        ...Array(4).fill('internal'),
+        ...Array(4).fill('connections'),
+      ]);
+    });
+
+    it('files the metrics exporter session under Internal', () => {
+      const entries = toPostgresEntries('demo1-1', session('6b048c19.31', 'cnpg_metrics_exporter'));
+      expect(new Set(entries.map(e => e.category))).toEqual(new Set(['internal']));
+    });
+
+    it('files a replica’s "connection received" line under Standby with the rest of its session', () => {
+      const base = { session_id: '6b048c19.40', connection_from: '10.244.0.7:48034' };
+      const entries = toPostgresEntries('demo1-1', [
+        record({ ...base, session_line_num: '1', message: 'connection received: host=10.244.0.7' }),
+        record({
+          ...base,
+          session_line_num: '2',
+          user_name: 'streaming_replica',
+          message: 'connection authorized: user=streaming_replica database=postgres',
+        }),
+      ]);
+      expect(entries.map(e => e.category)).toEqual(['standby', 'standby']);
+    });
+
+    it('leaves a session whose later lines were not loaded under Connections', () => {
+      const [received] = session('6b048c19.2e', 'pg_isready');
+      expect(toPostgresEntries('demo1-1', [received])[0].category).toBe('connections');
+    });
+  });
+
   it('copes with a record split across two chunks', () => {
     const whole = record({ message: 'checkpoint starting: time', backend_type: 'checkpointer' });
     const entries = toPostgresEntries('demo1-1', [whole.slice(0, 80), whole.slice(80) + '\n']);
@@ -499,27 +641,34 @@ describe('time buckets', () => {
     );
     expect(series).toEqual([1, 1]);
   });
-
-  it('compares the second half of a series with the first', () => {
-    expect(halfTrend([1, 1, 2, 2])).toEqual({ first: 2, second: 4, percent: 100 });
-    expect(halfTrend([4, 4, 2, 2])).toMatchObject({ percent: -50 });
-    expect(halfTrend([0, 0, 3, 3])).toMatchObject({ first: 0, second: 6, percent: null });
-    expect(halfTrend([])).toEqual({ first: 0, second: 0, percent: null });
-  });
 });
 
 describe('KPI predicates', () => {
   const make = (message: string, category: LogCategory, severity = 'LOG') =>
     ({ message, category, severity } as PostgresLogEntry);
 
-  it('counts accepted client connections only', () => {
-    expect(isClientConnection(make('connection authorized: user=app', 'connections'))).toBe(true);
-    expect(isClientConnection(make('connection received: host=1.2.3.4', 'connections'))).toBe(
-      false
-    );
+  it('counts refused connections only', () => {
+    const refused = (
+      message: string,
+      sqlState: string,
+      severity = 'FATAL',
+      category: LogCategory = 'connections'
+    ) => ({ message, category, severity, sqlState } as PostgresLogEntry);
+    // A replica refused at the door is as much a failed login as an application.
     expect(
-      isClientConnection(make('connection authorized: user=streaming_replica', 'standby'))
+      isFailedLogin(
+        refused('no pg_hba.conf entry for replication connection', '28000', 'FATAL', 'standby')
+      )
+    ).toBe(true);
+    expect(
+      isFailedLogin(refused('password authentication failed for user "app"', '28P01'))
+    ).toBe(true);
+    expect(isFailedLogin(refused('role "ghost" does not exist', '28000'))).toBe(true);
+    expect(isFailedLogin(refused('database "nope" does not exist', '3D000'))).toBe(true);
+    expect(
+      isFailedLogin(refused('terminating connection due to administrator command', '57P01'))
     ).toBe(false);
+    expect(isFailedLogin(refused('connection authorized: user=app', '00000', 'LOG'))).toBe(false);
   });
 
   it('counts slow statements, lock waits and errors', () => {
