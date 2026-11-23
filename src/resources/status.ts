@@ -133,6 +133,16 @@ export interface StatusInfo {
   description: string;
 }
 
+export type MapNodeStatus = 'success' | 'warning' | 'error';
+
+/** `info` and `neutral` must not raise a badge on the map. */
+export function mapNodeStatus(severity: Severity): MapNodeStatus {
+  if (severity === 'error' || severity === 'warning') {
+    return severity;
+  }
+  return 'success';
+}
+
 const info = (label: string, description: string): StatusInfo => ({
   severity: 'info',
   label,

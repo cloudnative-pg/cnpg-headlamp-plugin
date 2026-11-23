@@ -7,6 +7,7 @@ import {
   getImageVersion,
   humanizePluginName,
   KNOWN_PLUGIN_CAPABILITIES,
+  mapNodeStatus,
   parseBool,
 } from './status';
 
@@ -180,6 +181,16 @@ describe('clusterPhaseStatus', () => {
     expect(clusterPhaseStatus('Cluster in healthy state', '').description).toBe(
       'Cluster in healthy state'
     );
+  });
+});
+
+describe('mapNodeStatus', () => {
+  it.each(['warning', 'error'] as const)('keeps %s as is', severity => {
+    expect(mapNodeStatus(severity)).toBe(severity);
+  });
+
+  it.each(['success', 'info', 'neutral'] as const)('shows %s without a badge', severity => {
+    expect(mapNodeStatus(severity)).toBe('success');
   });
 });
 

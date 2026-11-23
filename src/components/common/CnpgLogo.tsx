@@ -1,7 +1,7 @@
 import { useTheme } from '@mui/material/styles';
 import { useId } from 'react';
 
-export function CnpgLogo({ size = 18 }: { size?: number }) {
+export function CnpgLogo({ size = 18 }: { size?: number | string }) {
   const theme = useTheme();
   const gradientId = useId();
   // The brand artwork ends in dark navy (#121646), which disappears on Headlamp's dark
