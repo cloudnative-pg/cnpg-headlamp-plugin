@@ -236,6 +236,22 @@ export class Cluster extends KubeObject<CnpgCluster> {
   }
 
   /**
+   * Merge-patches `spec.postgresql.parameters`: a string sets a key, `null` removes it, keys not
+   * listed are untouched. The patch carries `resourceVersion` (the one the caller edited from),
+   * so a concurrent change makes the API server reject it with a 409 instead of being
+   * overwritten.
+   */
+  setPostgresqlParameters(
+    parameters: Record<string, string | null>,
+    resourceVersion: string | undefined
+  ): Promise<any> {
+    return this.patch({
+      metadata: { resourceVersion },
+      spec: { postgresql: { parameters } },
+    } as any);
+  }
+
+  /**
    * Fences or unfences one instance, mirroring `kubectl cnpg fencing on|off`. The patch carries
    * the resourceVersion the list was computed from, so a concurrent change to the annotation
    * makes the API server reject it (409) instead of silently dropping the other edit.
