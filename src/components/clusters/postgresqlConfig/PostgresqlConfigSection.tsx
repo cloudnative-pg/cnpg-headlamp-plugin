@@ -89,12 +89,12 @@ function ParameterField({
           onChange={e => onChange(e.target.value)}
         />
       )}
+      {spec.restart && <Chip size="small" color="warning" variant="outlined" label="restart" />}
       <Tooltip title={tooltip}>
         <Box component="span" sx={{ display: 'inline-flex', color: 'text.secondary' }}>
           <Icon icon="mdi:information-outline" width={18} aria-label={`About ${spec.name}`} />
         </Box>
       </Tooltip>
-      {spec.restart && <Chip size="small" color="warning" variant="outlined" label="restart" />}
     </Box>
   );
 }
