@@ -296,7 +296,7 @@ function PortForwardDialog({
           {roleDescription(role)}
         </Alert>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
           <TextField
             size="small"
             label="Local port"
@@ -322,20 +322,28 @@ function PortForwardDialog({
           <Chip
             size="small"
             color={running ? 'success' : 'default'}
-            label={running ? `Forwarding ${LOCAL_HOST}:${port}` : 'Not running'}
+            variant={running ? 'outlined' : 'filled'}
+            icon={running ? <Icon icon="mdi:lan-connect" width={14} height={14} /> : undefined}
+            label={running ? `${LOCAL_HOST}:${port}` : 'Not running'}
           />
+          <Tooltip title="The tunnel stays on your machine: nothing is exposed through a Service. It is opened by Headlamp's backend, so it keeps running if you close this dialog.">
+            <Box
+              component="span"
+              tabIndex={0}
+              aria-label="About this port-forward"
+              sx={{ display: 'inline-flex', color: 'text.secondary', cursor: 'help' }}
+            >
+              <Icon icon="mdi:information-outline" width={20} height={20} />
+            </Box>
+          </Tooltip>
         </Box>
         {error && (
           <Alert severity="error" sx={{ mb: 1 }}>
             {error}
           </Alert>
         )}
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-          The tunnel stays on your machine: nothing is exposed through a Service. It is opened by
-          Headlamp&apos;s backend, so it keeps running if you close this dialog.
-        </Typography>
 
-        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+        <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 600 }}>
           Connection details
         </Typography>
         <CopyRow label="Host" value={LOCAL_HOST} />
@@ -347,31 +355,17 @@ function PortForwardDialog({
         ) : (
           <CopyRow label="Password" value={passwordCommand} />
         )}
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-          {password ? (
-            <>
-              Read from the <code>{secretName}</code> Secret. To fetch it from a terminal instead:{' '}
-              <code>{passwordCommand}</code>
-            </>
-          ) : (
-            <>
-              Could not read the <code>password</code> key of the <code>{secretName}</code> Secret
-              in namespace <code>{namespace}</code> (missing, or you can&apos;t read it), so the
-              copy button copies the command that prints it. Username and database shown are the
-              operator defaults.
-            </>
-          )}
-        </Typography>
+        {!password && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+            Could not read the <code>password</code> key of the <code>{secretName}</code> Secret in
+            namespace <code>{namespace}</code> (missing, or you can&apos;t read it), so the copy
+            button copies the command that prints it. Username and database shown are the operator
+            defaults.
+          </Typography>
+        )}
 
         <CodeBlock label="psql" command={psql} />
-        <CodeBlock label="psql via Docker (no local psql needed)" command={dockerPsql} />
-        <Typography variant="subtitle2" sx={{ mt: 2, mb: 0.5 }}>
-          pgAdmin
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Register &gt; Server, then on the Connection tab enter the host, port, database, username
-          and password above. On the SSL tab set the SSL mode to <code>require</code>.
-        </Typography>
+        <CodeBlock label="psql via Docker" command={dockerPsql} />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
