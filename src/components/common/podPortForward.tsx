@@ -90,8 +90,12 @@ function decode(value?: string): string | undefined {
   }
 }
 
-function CopyRow({ label, value, secret }: { label: string; value: string; secret?: boolean }) {
+// `masked` hides the value behind bullets until the user reveals it; copying always copies the
+// real value either way.
+function CopyRow({ label, value, masked }: { label: string; value: string; masked?: boolean }) {
   const { enqueueSnackbar } = useSnackbar();
+  const [revealed, setRevealed] = useState(false);
+  const hidden = masked && !revealed;
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.25 }}>
       <Typography variant="body2" color="text.secondary" sx={{ width: 90, flexShrink: 0 }}>
@@ -102,8 +106,23 @@ function CopyRow({ label, value, secret }: { label: string; value: string; secre
         component="code"
         sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontFamily: 'monospace' }}
       >
-        {value}
+        {hidden ? '••••••••••••' : value}
       </Typography>
+      {masked && (
+        <Tooltip title={revealed ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}>
+          <IconButton
+            size="small"
+            aria-label={revealed ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+            onClick={() => setRevealed(r => !r)}
+          >
+            <Icon
+              icon={revealed ? 'mdi:eye-off-outline' : 'mdi:eye-outline'}
+              width={16}
+              height={16}
+            />
+          </IconButton>
+        </Tooltip>
+      )}
       <Tooltip title={`Copy ${label.toLowerCase()}`}>
         <IconButton
           size="small"
@@ -117,7 +136,7 @@ function CopyRow({ label, value, secret }: { label: string; value: string; secre
               );
           }}
         >
-          <Icon icon={secret ? 'mdi:key-outline' : 'mdi:content-copy'} width={16} height={16} />
+          <Icon icon="mdi:content-copy" width={16} height={16} />
         </IconButton>
       </Tooltip>
     </Box>
@@ -207,6 +226,7 @@ function PortForwardDialog({
   // Fall back to the operator's defaults if the secret is missing or still loading, so the
   // instructions stay usable for clusters bootstrapped with a custom owner/database.
   const username = decode(secretData.username) ?? 'app';
+  const password = decode(secretData.password);
   const database = decode(secretData.dbname) ?? 'app';
 
   const [localPort, setLocalPort] = useState('');
@@ -322,12 +342,25 @@ function PortForwardDialog({
         <CopyRow label="Port" value={displayPort} />
         <CopyRow label="Database" value={database} />
         <CopyRow label="Username" value={username} />
-        <CopyRow label="Password" value={passwordCommand} secret />
+        {password ? (
+          <CopyRow label="Password" value={password} masked />
+        ) : (
+          <CopyRow label="Password" value={passwordCommand} />
+        )}
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-          The password is the <code>password</code> key of the <code>{secretName}</code> Secret in
-          namespace <code>{namespace}</code>; the copy button above copies the command that prints
-          it.{' '}
-          {!secret && 'Username and database shown are the operator defaults (secret not found).'}
+          {password ? (
+            <>
+              Read from the <code>{secretName}</code> Secret. To fetch it from a terminal instead:{' '}
+              <code>{passwordCommand}</code>
+            </>
+          ) : (
+            <>
+              Could not read the <code>password</code> key of the <code>{secretName}</code> Secret
+              in namespace <code>{namespace}</code> (missing, or you can&apos;t read it), so the
+              copy button copies the command that prints it. Username and database shown are the
+              operator defaults.
+            </>
+          )}
         </Typography>
 
         <CodeBlock label="psql" command={psql} />
