@@ -38,7 +38,7 @@ export const LOG_CATEGORIES: { id: LogCategory; label: string; description: stri
   },
   {
     id: 'statements',
-    label: 'Statements',
+    label: 'Slow statements',
     description: 'Slow statements (log_min_duration_statement), logged statements, temp files',
   },
   { id: 'wal', label: 'WAL', description: 'Checkpoints, restartpoints and WAL activity' },
@@ -60,7 +60,7 @@ export const LOG_CATEGORIES: { id: LogCategory; label: string; description: stri
   },
   {
     id: 'standby',
-    label: 'Standby',
+    label: 'Replica',
     description: 'Streaming replication: WAL sender/receiver, standby connections, recovery',
   },
   {
