@@ -209,11 +209,14 @@ function PortForwardDialog({
   const username = decode(secretData.username) ?? 'app';
   const database = decode(secretData.dbname) ?? 'app';
 
-  const [localPort, setLocalPort] = useState(forward?.port ?? POSTGRES_PORT);
+  const [localPort, setLocalPort] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const running = !!forward;
+  // Empty means "let the backend pick a free port", like Headlamp's own pod port-forward; the
+  // real port is only known once the forward is running.
   const port = forward?.port ?? localPort;
+  const displayPort = port || '<local-port>';
 
   async function start() {
     setBusy(true);
@@ -251,8 +254,9 @@ function PortForwardDialog({
     }
   }
 
-  const portValid = /^\d{1,5}$/.test(port) && Number(port) > 0 && Number(port) < 65536;
-  const uri = `postgresql://${username}@${LOCAL_HOST}:${port}/${database}?sslmode=require`;
+  const portValid =
+    port === '' || (/^\d{1,5}$/.test(port) && Number(port) > 0 && Number(port) < 65536);
+  const uri = `postgresql://${username}@${LOCAL_HOST}:${displayPort}/${database}?sslmode=require`;
   const psql = `psql "${uri}"`;
   const passwordCommand = `kubectl get secret ${secretName} -n ${namespace} -o jsonpath='{.data.password}' | base64 -d`;
 
@@ -272,11 +276,14 @@ function PortForwardDialog({
             size="small"
             label="Local port"
             value={port}
+            placeholder="Auto"
             onChange={e => setLocalPort(e.target.value.trim())}
             disabled={running || busy}
             error={!portValid}
-            helperText={!portValid ? 'Enter a port between 1 and 65535' : undefined}
-            sx={{ width: 140 }}
+            helperText={
+              !portValid ? 'Enter a port between 1 and 65535' : 'Empty = pick a free port'
+            }
+            sx={{ width: 190 }}
           />
           {running ? (
             <Button variant="outlined" color="error" onClick={stop} disabled={busy}>
@@ -307,7 +314,7 @@ function PortForwardDialog({
           Connection details
         </Typography>
         <CopyRow label="Host" value={LOCAL_HOST} />
-        <CopyRow label="Port" value={port} />
+        <CopyRow label="Port" value={displayPort} />
         <CopyRow label="Database" value={database} />
         <CopyRow label="Username" value={username} />
         <CopyRow label="Password" value={passwordCommand} secret />
