@@ -25,7 +25,14 @@ import Typography from '@mui/material/Typography';
 import { useSnackbar } from 'notistack';
 import { useRef, useState } from 'react';
 import { Cluster } from '../../../resources/cluster';
-import { collectEdited, diffParameters, ExtraRow, toMergePatch, validateExtras } from './diff';
+import {
+  collectEdited,
+  diffParameters,
+  ExtraRow,
+  OPERATOR_MANAGED_PARAMETER_NAMES,
+  toMergePatch,
+  validateExtras,
+} from './diff';
 import { CURATED_PARAMETER_NAMES, PARAMETER_GROUPS, ParameterSpec } from './parameters';
 
 function formatError(error: unknown): string {
@@ -119,7 +126,9 @@ function EditDialog({
   });
   const [extras, setExtras] = useState<ExtraRow[]>(() =>
     Object.keys(current)
-      .filter(key => !CURATED_PARAMETER_NAMES.has(key))
+      .filter(
+        key => !CURATED_PARAMETER_NAMES.has(key) && !OPERATOR_MANAGED_PARAMETER_NAMES.has(key)
+      )
       .sort()
       .map(key => ({ id: nextId.current++, key, value: current[key] }))
   );

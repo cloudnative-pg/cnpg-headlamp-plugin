@@ -1,5 +1,14 @@
 import { CURATED_PARAMETER_NAMES, RESTART_PARAMETER_NAMES } from './parameters';
 
+/**
+ * Parameters with a dedicated field in the CNPG spec (`spec.postgresql.shared_preload_libraries`)
+ * or otherwise managed by the operator. They are never offered as free-form rows nor patched, so
+ * a stray entry in `spec.postgresql.parameters` can't show up as a perpetual pending change.
+ */
+export const OPERATOR_MANAGED_PARAMETER_NAMES: ReadonlySet<string> = new Set([
+  'shared_preload_libraries',
+]);
+
 export interface ParameterChange {
   key: string;
   /** Current value, undefined when the key isn't set yet. */
@@ -47,7 +56,12 @@ export function diffParameters(
   const keys = new Set([...Object.keys(current), ...Object.keys(edited)]);
   const changes: ParameterChange[] = [];
   for (const key of Array.from(keys).sort()) {
-    const from = current[key];
+    if (OPERATOR_MANAGED_PARAMETER_NAMES.has(key)) {
+      continue;
+    }
+    // collectEdited drops empty values, so an empty current value must count as unset too,
+    // otherwise it would be reported as a removal every time the dialog opens.
+    const from = current[key]?.trim() === '' ? undefined : current[key];
     const to = edited[key];
     if (from !== to) {
       changes.push({ key, from, to, restart: RESTART_PARAMETER_NAMES.has(key) });

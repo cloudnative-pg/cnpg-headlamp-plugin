@@ -38,6 +38,12 @@ describe('diffParameters', () => {
     expect(diffParameters(current, { ...current })).toEqual([]);
   });
 
+  it('ignores operator-managed keys and empty current values', () => {
+    expect(
+      diffParameters({ shared_preload_libraries: 'pg_stat_statements', work_mem: '' }, {})
+    ).toEqual([]);
+  });
+
   it('reports additions, changes and removals, flagging restarts', () => {
     const changes = diffParameters(current, {
       shared_buffers: '1GB',
