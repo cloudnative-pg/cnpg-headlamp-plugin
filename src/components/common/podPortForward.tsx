@@ -258,6 +258,11 @@ function PortForwardDialog({
     port === '' || (/^\d{1,5}$/.test(port) && Number(port) > 0 && Number(port) < 65536);
   const uri = `postgresql://${username}@${LOCAL_HOST}:${displayPort}/${database}?sslmode=require`;
   const psql = `psql "${uri}"`;
+  // For users without a local psql: the container reaches the forwarded port on the host through
+  // host.docker.internal (Docker Desktop on macOS/Windows; on Linux add
+  // --add-host=host.docker.internal:host-gateway).
+  const dockerUri = uri.replace(`@${LOCAL_HOST}:`, '@host.docker.internal:');
+  const dockerPsql = `docker run --rm -it postgres:17 psql "${dockerUri}"`;
   const passwordCommand = `kubectl get secret ${secretName} -n ${namespace} -o jsonpath='{.data.password}' | base64 -d`;
 
   return (
@@ -326,6 +331,7 @@ function PortForwardDialog({
         </Typography>
 
         <CodeBlock label="psql" command={psql} />
+        <CodeBlock label="psql via Docker (no local psql needed)" command={dockerPsql} />
         <Typography variant="subtitle2" sx={{ mt: 2, mb: 0.5 }}>
           pgAdmin
         </Typography>
