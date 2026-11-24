@@ -16,6 +16,7 @@ import { useHistory } from 'react-router-dom';
 import { Cluster } from '../../resources/cluster';
 import { AuthDisabledButton } from '../common/AuthDisabledButton';
 import { SummaryBar, SummaryStat, useNamespaceScope } from '../common/ListHeader';
+import { ClusterPortForwardChip } from '../common/podPortForward';
 import { StatusChip, StatusIcon } from '../common/SeverityStatus';
 import { getClusterCreateUrl } from './create/CreatePage';
 import { HibernateListAction } from './hibernate';
@@ -114,7 +115,17 @@ const clusterColumns: (ResourceTableColumn<Cluster> | ColumnType)[] = [
     id: 'status',
     label: 'Status',
     getValue: item => item.phaseStatus.label,
-    render: item => <StatusChip status={item.phaseStatus} />,
+    render: item => (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+        <StatusChip status={item.phaseStatus} />
+        <ClusterPortForwardChip
+          clusterName={item.getName()}
+          namespace={item.getNamespace()}
+          cluster={item.cluster}
+          primaryName={item.currentPrimary}
+        />
+      </Box>
+    ),
   },
   {
     id: 'backup',

@@ -11,13 +11,14 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
+import { SxProps, Theme } from '@mui/material/styles';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useSnackbar } from 'notistack';
-import { ReactElement, useCallback, useEffect, useState } from 'react';
+import { ReactElement, useCallback, useEffect, useMemo, useState } from 'react';
 import { Pod } from './podActions';
 
 const POSTGRES_PORT = '5432';
@@ -44,44 +45,82 @@ function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+// One shared poller per Headlamp cluster context: the cluster list renders a chip per row, and
+// each row polling on its own would send the same /portforward/list request many times over.
+interface ForwardStore {
+  entries: PortForwardEntry[];
+  listeners: Set<(entries: PortForwardEntry[]) => void>;
+  timer?: ReturnType<typeof setInterval>;
+}
+const forwardStores = new Map<string, ForwardStore>();
+
+function refreshStore(cluster: string) {
+  const store = forwardStores.get(cluster);
+  if (!store) return;
+  ApiProxy.listPortForward(cluster)
+    .then((entries: PortForwardEntry[] | null) => {
+      store.entries = (entries ?? []).filter(
+        entry => entry.targetPort === POSTGRES_PORT && entry.status === 'Running'
+      );
+      store.listeners.forEach(listener => listener(store.entries));
+    })
+    // The list is a nicety; a failing backend just means no connection state is shown.
+    .catch(() => {});
+}
+
 /**
- * Polls Headlamp's backend for the active port-forwards of one Headlamp cluster context and
- * returns the running PostgreSQL ones, keyed by pod name. The backend (not this plugin) owns the
- * forward's lifetime, so polling is the only way to notice a forward started elsewhere (Headlamp's
- * own Pod page) or one that died.
+ * The running PostgreSQL port-forwards of one Headlamp cluster context. The backend (not this
+ * plugin) owns a forward's lifetime, so polling is the only way to notice a forward started
+ * elsewhere (Headlamp's own Pod page) or one that died.
  */
+function useRunningForwards(cluster: string | undefined): {
+  entries: PortForwardEntry[];
+  refresh: () => void;
+} {
+  const [entries, setEntries] = useState<PortForwardEntry[]>(
+    () => (cluster && forwardStores.get(cluster)?.entries) || []
+  );
+
+  useEffect(() => {
+    if (!cluster) return;
+    let store = forwardStores.get(cluster);
+    if (!store) {
+      store = { entries: [], listeners: new Set() };
+      forwardStores.set(cluster, store);
+    }
+    store.listeners.add(setEntries);
+    if (!store.timer) {
+      refreshStore(cluster);
+      store.timer = setInterval(() => refreshStore(cluster), POLL_INTERVAL_MS);
+    } else {
+      setEntries(store.entries);
+    }
+    return () => {
+      store!.listeners.delete(setEntries);
+      if (store!.listeners.size === 0) {
+        clearInterval(store!.timer);
+        forwardStores.delete(cluster);
+      }
+    };
+  }, [cluster]);
+
+  const refresh = useCallback(() => {
+    if (cluster) refreshStore(cluster);
+  }, [cluster]);
+
+  return { entries, refresh };
+}
+
+/** Running forwards of one namespace, keyed by pod name (for the topology cards). */
 export function usePostgresPortForwards(
   cluster: string | undefined,
   namespace: string
 ): { forwards: Map<string, PortForwardEntry>; refresh: () => void } {
-  const [forwards, setForwards] = useState<Map<string, PortForwardEntry>>(new Map());
-
-  const refresh = useCallback(() => {
-    if (!cluster) return;
-    ApiProxy.listPortForward(cluster)
-      .then((entries: PortForwardEntry[] | null) => {
-        const next = new Map<string, PortForwardEntry>();
-        (entries ?? []).forEach(entry => {
-          if (
-            entry.namespace === namespace &&
-            entry.targetPort === POSTGRES_PORT &&
-            entry.status === 'Running'
-          ) {
-            next.set(entry.pod, entry);
-          }
-        });
-        setForwards(next);
-      })
-      // The list is a nicety; a failing backend just means no connection state is shown.
-      .catch(() => {});
-  }, [cluster, namespace]);
-
-  useEffect(() => {
-    refresh();
-    const timer = setInterval(refresh, POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [refresh]);
-
+  const { entries, refresh } = useRunningForwards(cluster);
+  const forwards = useMemo(
+    () => new Map(entries.filter(e => e.namespace === namespace).map(e => [e.pod, e])),
+    [entries, namespace]
+  );
   return { forwards, refresh };
 }
 
@@ -505,6 +544,116 @@ export function PortForwardButton({
           initialClient={open}
           onClose={() => setOpen(null)}
           onChanged={onChanged}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * The "localhost:<port>" chip shown wherever a running port-forward is surfaced (topology cards,
+ * cluster list), so the look and the tooltip stay identical. Clickable when given an onClick.
+ */
+export function PortForwardChip({
+  label,
+  onClick,
+  sx,
+}: {
+  label: string;
+  onClick?: () => void;
+  sx?: SxProps<Theme>;
+}) {
+  return (
+    <Tooltip title="Port-forward active. Open the port-forward dialog to see connection details or stop it.">
+      <Chip
+        size="small"
+        color="success"
+        variant="outlined"
+        clickable={!!onClick}
+        onClick={onClick}
+        icon={<Icon icon="mdi:lan-connect" width={14} height={14} />}
+        label={label}
+        sx={sx}
+      />
+    </Tooltip>
+  );
+}
+
+// Loads the pod the dialog needs (the list only knows the cluster) before opening it.
+function ForwardDialogLoader({
+  entry,
+  clusterName,
+  role,
+  onClose,
+  onChanged,
+}: {
+  entry: PortForwardEntry;
+  clusterName: string;
+  role: InstanceRole;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [pod] = K8s.ResourceClasses.Pod.useGet(entry.pod, entry.namespace, {
+    cluster: entry.cluster,
+  });
+  if (!pod) return null;
+  return (
+    <PortForwardDialog
+      pod={pod}
+      clusterName={clusterName}
+      role={role}
+      forward={entry}
+      initialClient="psql"
+      onClose={onClose}
+      onChanged={onChanged}
+    />
+  );
+}
+
+/**
+ * Shown in the cluster list's Status column while any instance of the cluster is port-forwarded:
+ * a "localhost:<port>" chip whose tooltip names the instance, and whose click opens the same
+ * dialog as the topology's port-forward action. Renders nothing when no forward is running.
+ */
+export function ClusterPortForwardChip({
+  clusterName,
+  namespace,
+  cluster,
+  primaryName,
+}: {
+  clusterName: string;
+  namespace: string;
+  cluster: string | undefined;
+  primaryName?: string;
+}) {
+  const { entries, refresh } = useRunningForwards(cluster);
+  const [open, setOpen] = useState(false);
+
+  // Instance pods are named <cluster>-<serial>; the exact pattern keeps "foo" from matching
+  // the instances of a sibling cluster called "foo-bar".
+  const mine = useMemo(() => {
+    const pattern = new RegExp(`^${clusterName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+$`);
+    return entries
+      .filter(e => e.namespace === namespace && pattern.test(e.pod))
+      .sort((a, b) => Number(b.pod === primaryName) - Number(a.pod === primaryName));
+  }, [entries, clusterName, namespace, primaryName]);
+
+  if (mine.length === 0) return null;
+  const first = mine[0];
+
+  return (
+    <>
+      <PortForwardChip
+        label={`localhost:${first.port}${mine.length > 1 ? ` +${mine.length - 1}` : ''}`}
+        onClick={() => setOpen(true)}
+      />
+      {open && (
+        <ForwardDialogLoader
+          entry={first}
+          clusterName={clusterName}
+          role={first.pod === primaryName ? 'primary' : 'standby'}
+          onClose={() => setOpen(false)}
+          onChanged={refresh}
         />
       )}
     </>

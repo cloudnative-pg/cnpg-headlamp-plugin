@@ -46,6 +46,7 @@ import { Pod, PodPhaseLabel, PodStatusLabel } from '../common/podActions';
 import { ViewLogsButton } from '../common/podLogs';
 import {
   PortForwardButton,
+  PortForwardChip,
   PortForwardEntry,
   usePostgresPortForwards,
 } from '../common/podPortForward';
@@ -472,18 +473,7 @@ function InstanceNode({
           onChanged={onForwardChanged}
         />
       </Box>
-      {forward && (
-        <Tooltip title="Port-forward active. Open the port-forward dialog to see connection details or stop it.">
-          <Chip
-            size="small"
-            color="success"
-            variant="outlined"
-            icon={<Icon icon="mdi:lan-connect" width={14} height={14} />}
-            label={`localhost:${forward.port}`}
-            sx={{ mt: 0.5 }}
-          />
-        </Tooltip>
-      )}
+      {forward && <PortForwardChip label={`localhost:${forward.port}`} sx={{ mt: 0.5 }} />}
     </Box>
   );
 }
