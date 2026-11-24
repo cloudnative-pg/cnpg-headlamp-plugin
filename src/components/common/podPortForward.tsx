@@ -17,7 +17,7 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useSnackbar } from 'notistack';
-import { useCallback, useEffect, useState } from 'react';
+import { ReactElement, useCallback, useEffect, useState } from 'react';
 import { Pod } from './podActions';
 
 const POSTGRES_PORT = '5432';
@@ -25,6 +25,7 @@ const LOCAL_HOST = 'localhost';
 const POLL_INTERVAL_MS = 4000;
 
 export type InstanceRole = 'primary' | 'standby';
+type ClientTab = 'psql' | 'pgadmin';
 
 // Shape of the entries Headlamp's backend returns from /portforward/list (the SDK types it as
 // PortForward, but that type isn't reachable from a plugin's import surface).
@@ -210,6 +211,7 @@ function PortForwardDialog({
   clusterName,
   role,
   forward,
+  initialClient,
   onClose,
   onChanged,
 }: {
@@ -217,6 +219,7 @@ function PortForwardDialog({
   clusterName: string;
   role: InstanceRole;
   forward?: PortForwardEntry;
+  initialClient: ClientTab;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -233,7 +236,7 @@ function PortForwardDialog({
   const database = decode(secretData.dbname) ?? 'app';
 
   const [localPort, setLocalPort] = useState('');
-  const [client, setClient] = useState<'psql' | 'pgadmin'>('psql');
+  const [client, setClient] = useState<ClientTab>(initialClient);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const running = !!forward;
@@ -453,18 +456,19 @@ export function PortForwardButton({
   forward?: PortForwardEntry;
   onChanged: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  // Which client tab the dialog opens on; null while it's closed.
+  const [open, setOpen] = useState<ClientTab | null>(null);
   // Fails open until the check resolves; the API still enforces RBAC server-side.
   const [allowed, setAllowed] = useState(true);
 
-  const button = (
-    <ActionButton
-      description={forward ? `Port-forward (localhost:${forward.port})` : 'Port-forward'}
-      icon={forward ? 'mdi:lan-connect' : 'mdi:lan-pending'}
-      onClick={() => setOpen(true)}
-      iconButtonProps={{ disabled: !allowed }}
-    />
-  );
+  const withAuth = (button: ReactElement) =>
+    allowed ? (
+      button
+    ) : (
+      <Tooltip title="You don't have permission to port-forward to this pod.">
+        <span>{button}</span>
+      </Tooltip>
+    );
 
   return (
     <>
@@ -476,12 +480,21 @@ export function PortForwardButton({
       >
         {null}
       </AuthVisible>
-      {allowed ? (
-        button
-      ) : (
-        <Tooltip title="You don't have permission to port-forward to this pod.">
-          <span>{button}</span>
-        </Tooltip>
+      {withAuth(
+        <ActionButton
+          description={forward ? `Port-forward (localhost:${forward.port})` : 'Port-forward'}
+          icon={forward ? 'mdi:lan-connect' : 'mdi:lan-pending'}
+          onClick={() => setOpen('psql')}
+          iconButtonProps={{ disabled: !allowed }}
+        />
+      )}
+      {withAuth(
+        <ActionButton
+          description="Connect with pgAdmin"
+          icon="simple-icons:postgresql"
+          onClick={() => setOpen('pgadmin')}
+          iconButtonProps={{ disabled: !allowed }}
+        />
       )}
       {open && (
         <PortForwardDialog
@@ -489,7 +502,8 @@ export function PortForwardButton({
           clusterName={clusterName}
           role={role}
           forward={forward}
-          onClose={() => setOpen(false)}
+          initialClient={open}
+          onClose={() => setOpen(null)}
           onChanged={onChanged}
         />
       )}
