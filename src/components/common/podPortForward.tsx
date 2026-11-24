@@ -10,6 +10,7 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
+import Link from '@mui/material/Link';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
@@ -393,25 +394,38 @@ function PortForwardDialog({
             <CodeBlock label="psql via Docker" command={dockerPsql} />
           </>
         ) : (
-          <Box component="ol" sx={{ pl: 2.5, mt: 1.5, mb: 0, typography: 'body2' }}>
-            <li>
-              In pgAdmin, right-click <strong>Servers</strong> and choose{' '}
-              <strong>Register &gt; Server…</strong>.
-            </li>
-            <li>
-              On the <strong>General</strong> tab, give it a name (for example{' '}
-              <code>{clusterName}</code>).
-            </li>
-            <li>
-              On the <strong>Connection</strong> tab, enter the host, port, database, username and
-              password shown above.
-            </li>
-            <li>
-              On the <strong>Parameters</strong> tab, set <strong>SSL mode</strong> to{' '}
-              <code>require</code>.
-            </li>
-            <li>Save. The connection works only while the port-forward is running.</li>
-          </Box>
+          <>
+            <Box component="ol" sx={{ pl: 2.5, mt: 1.5, mb: 0, typography: 'body2' }}>
+              <li>
+                In pgAdmin, right-click <strong>Servers</strong> and choose{' '}
+                <strong>Register &gt; Server…</strong>.
+              </li>
+              <li>
+                On the <strong>General</strong> tab, give it a name (for example{' '}
+                <code>{clusterName}</code>).
+              </li>
+              <li>
+                On the <strong>Connection</strong> tab, enter the host, port, database, username and
+                password shown above.
+              </li>
+              <li>
+                On the <strong>Parameters</strong> tab, set <strong>SSL mode</strong> to{' '}
+                <code>require</code>.
+              </li>
+              <li>Save. The connection works only while the port-forward is running.</li>
+            </Box>
+            <Typography variant="body2" sx={{ mt: 1.5 }}>
+              See the{' '}
+              <Link
+                href="https://www.pgadmin.org/docs/pgadmin4/latest/server_dialog.html"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                official pgAdmin documentation
+              </Link>{' '}
+              for the full list of server options.
+            </Typography>
+          </>
         )}
       </DialogContent>
       <DialogActions>
