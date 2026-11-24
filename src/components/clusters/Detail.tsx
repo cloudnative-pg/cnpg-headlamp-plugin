@@ -75,6 +75,7 @@ import {
 import { launchConnectActivity } from './connect';
 import { FenceAction } from './fence';
 import { HibernateDetailAction } from './hibernate';
+import { LogsTab } from './logs/LogsTab';
 import { ScaleAction } from './scale';
 import { SwitchoverAction } from './switchover';
 
@@ -2055,6 +2056,7 @@ export function ClusterDetail() {
           <Tab label="Overview" />
           <Tab label="Instances" />
           <Tab label="Live Metrics" />
+          <Tab label="Logs" />
           <Tab
             label={
               <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
@@ -2072,10 +2074,11 @@ export function ClusterDetail() {
       {activeTab === 0 && <OverviewTab cluster={cluster} lease={lease} />}
       {activeTab === 1 && <InstancesTab cluster={cluster} />}
       {activeTab === 2 && <MetricsSection cluster={cluster} />}
-      {activeTab === 3 && <BackupsTab cluster={cluster} />}
-      {activeTab === 4 && <PvcsSection cluster={cluster} />}
-      {activeTab === 5 && <ConfigurationTab cluster={cluster} lease={lease} />}
-      {activeTab === 6 && <RecentEventsCard cluster={cluster} />}
+      {activeTab === 3 && <LogsTab cluster={cluster} />}
+      {activeTab === 4 && <BackupsTab cluster={cluster} />}
+      {activeTab === 5 && <PvcsSection cluster={cluster} />}
+      {activeTab === 6 && <ConfigurationTab cluster={cluster} lease={lease} />}
+      {activeTab === 7 && <RecentEventsCard cluster={cluster} />}
     </Box>
   );
 }
