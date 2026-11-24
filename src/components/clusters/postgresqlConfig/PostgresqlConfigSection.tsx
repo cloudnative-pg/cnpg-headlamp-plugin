@@ -178,7 +178,7 @@ function EditDialog({
           </Typography>
           {PARAMETER_GROUPS.map(group => (
             <Box key={group.title} sx={{ mb: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
                 {group.title}
               </Typography>
               <Box
