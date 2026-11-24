@@ -10,6 +10,8 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -230,6 +232,7 @@ function PortForwardDialog({
   const database = decode(secretData.dbname) ?? 'app';
 
   const [localPort, setLocalPort] = useState('');
+  const [client, setClient] = useState<'psql' | 'pgadmin'>('psql');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const running = !!forward;
@@ -364,8 +367,52 @@ function PortForwardDialog({
           </Typography>
         )}
 
-        <CodeBlock label="psql" command={psql} />
-        <CodeBlock label="psql via Docker" command={dockerPsql} />
+        <Tabs
+          value={client}
+          onChange={(_, value) => setClient(value)}
+          sx={{ mt: 1, minHeight: 40, borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab
+            value="psql"
+            label="psql"
+            icon={<Icon icon="mdi:console" width={18} height={18} />}
+            iconPosition="start"
+            sx={{ minHeight: 40, textTransform: 'none' }}
+          />
+          <Tab
+            value="pgadmin"
+            label="pgAdmin"
+            icon={<Icon icon="simple-icons:postgresql" width={18} height={18} />}
+            iconPosition="start"
+            sx={{ minHeight: 40, textTransform: 'none' }}
+          />
+        </Tabs>
+        {client === 'psql' ? (
+          <>
+            <CodeBlock label="psql" command={psql} />
+            <CodeBlock label="psql via Docker" command={dockerPsql} />
+          </>
+        ) : (
+          <Box component="ol" sx={{ pl: 2.5, mt: 1.5, mb: 0, typography: 'body2' }}>
+            <li>
+              In pgAdmin, right-click <strong>Servers</strong> and choose{' '}
+              <strong>Register &gt; Server…</strong>.
+            </li>
+            <li>
+              On the <strong>General</strong> tab, give it a name (for example{' '}
+              <code>{clusterName}</code>).
+            </li>
+            <li>
+              On the <strong>Connection</strong> tab, enter the host, port, database, username and
+              password shown above.
+            </li>
+            <li>
+              On the <strong>Parameters</strong> tab, set <strong>SSL mode</strong> to{' '}
+              <code>require</code>.
+            </li>
+            <li>Save. The connection works only while the port-forward is running.</li>
+          </Box>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
