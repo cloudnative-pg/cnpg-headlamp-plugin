@@ -324,11 +324,16 @@ function PortForwardDialog({
     port === '' || (/^\d{1,5}$/.test(port) && Number(port) > 0 && Number(port) < 65536);
   const uri = `postgresql://${username}@${LOCAL_HOST}:${displayPort}/${database}?sslmode=require`;
   const psql = `psql "${uri}"`;
-  // For users without a local psql: the container reaches the forwarded port on the host through
-  // host.docker.internal (Docker Desktop on macOS/Windows; on Linux add
-  // --add-host=host.docker.internal:host-gateway).
-  const dockerUri = uri.replace(`@${LOCAL_HOST}:`, '@host.docker.internal:');
-  const dockerPsql = `docker run --rm -it postgres:17 psql "${dockerUri}"`;
+  // For users without a local psql: the port-forward binds to loopback only (127.0.0.1), so a
+  // container on Docker's bridge network can't reach it via host.docker.internal there either
+  // (that only resolves to the bridge gateway, not the host's loopback interface). The two
+  // platforms need different fixes:
+  // - Docker Desktop (macOS/Windows): host.docker.internal is a special proxy that *does* reach
+  //   the host's loopback, since Docker itself runs inside a VM.
+  // - Linux: plain Docker has no such proxy, but --network=host shares the host's network
+  //   namespace directly, making the container's "localhost" the host's loopback.
+  const dockerPsqlMac = `docker run --rm -it postgres:17 psql "${uri.replace(`@${LOCAL_HOST}:`, '@host.docker.internal:')}"`;
+  const dockerPsqlLinux = `docker run --rm -it --network=host postgres:17 psql "${uri}"`;
   const passwordCommand = `kubectl get secret ${secretName} -n ${namespace} -o jsonpath='{.data.password}' | base64 -d`;
 
   return (
@@ -433,7 +438,8 @@ function PortForwardDialog({
         {client === 'psql' ? (
           <>
             <CodeBlock label="psql" command={psql} />
-            <CodeBlock label="psql via Docker" command={dockerPsql} />
+            <CodeBlock label="psql via Docker (macOS/Windows)" command={dockerPsqlMac} />
+            <CodeBlock label="psql via Docker (Linux)" command={dockerPsqlLinux} />
           </>
         ) : (
           <>
