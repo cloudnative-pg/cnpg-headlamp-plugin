@@ -327,7 +327,7 @@ describe('parsePostgresLogTime', () => {
 
 describe('toPostgresEntries', () => {
   const lines = [
-    // instance-manager noise and the plain-text duplicate of a record: both must be dropped
+    // an instance-manager line (kept as 'manager') and the plain-text duplicate of a record (dropped)
     JSON.stringify({
       level: 'info',
       ts: '2026-11-20T10:17:00Z',
@@ -362,10 +362,15 @@ describe('toPostgresEntries', () => {
     ),
   ];
 
-  it('keeps only structured postgres records', () => {
+  it('keeps structured postgres records and instance-manager lines', () => {
     const entries = toPostgresEntries('demo1-1', lines);
-    expect(entries).toHaveLength(2);
-    expect(entries.map(e => e.category)).toEqual(['connections', 'constraints']);
+    expect(entries).toHaveLength(3);
+    expect(entries.map(e => e.category)).toEqual(['connections', 'constraints', 'manager']);
+    expect(entries[2]).toMatchObject({
+      message: 'reloading the instance',
+      logger: 'instance-manager',
+      severity: 'INFO',
+    });
   });
 
   it('extracts the fields the UI shows', () => {
@@ -660,9 +665,9 @@ describe('KPI predicates', () => {
         refused('no pg_hba.conf entry for replication connection', '28000', 'FATAL', 'standby')
       )
     ).toBe(true);
-    expect(
-      isFailedLogin(refused('password authentication failed for user "app"', '28P01'))
-    ).toBe(true);
+    expect(isFailedLogin(refused('password authentication failed for user "app"', '28P01'))).toBe(
+      true
+    );
     expect(isFailedLogin(refused('role "ghost" does not exist', '28000'))).toBe(true);
     expect(isFailedLogin(refused('database "nope" does not exist', '3D000'))).toBe(true);
     expect(

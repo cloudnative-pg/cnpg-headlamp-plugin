@@ -2,12 +2,13 @@
  * Pure logic behind the cluster Logs tab: parsing pod logs into Postgres log events, classifying,
  * filtering and aggregating them. No React, so it is unit-tested (postgresLog.test.ts).
  *
- * Only structured Postgres records are used (logger "postgres", msg "record": the csvlog columns
- * CNPG relays as JSON, see https://cloudnative-pg.io/docs/1.30/logging). Instance-manager lines
- * and the plain-text stderr lines from before the logging collector starts are left out; the
- * per-pod log viewer shows those.
+ * Structured Postgres records (logger "postgres", msg "record": the csvlog columns CNPG relays as
+ * JSON, see https://cloudnative-pg.io/docs/1.30/logging) are parsed into full entries. The
+ * instance manager's own structured lines (any other logger) are kept too, as the "manager"
+ * category. The plain-text stderr lines from before the logging collector starts, and the
+ * plain-text duplicates of records, are left out; the per-pod log viewer shows those.
  */
-import { formatLogValue, parseCnpgLogLines, parseTimestamp } from './cnpgLog';
+import { formatLogValue, parseCnpgLogLines, ParsedLogLine, parseTimestamp } from './cnpgLog';
 
 export const POSTGRES_CONTAINER = 'postgres';
 
@@ -22,6 +23,7 @@ export type LogCategory =
   | 'server'
   | 'standby'
   | 'errors'
+  | 'manager'
   | 'other';
 
 export const LOG_CATEGORIES: { id: LogCategory; label: string; description: string }[] = [
@@ -67,6 +69,12 @@ export const LOG_CATEGORIES: { id: LogCategory; label: string; description: stri
     id: 'errors',
     label: 'App errors',
     description: 'Any other ERROR, FATAL or PANIC: syntax errors, permission denied, timeouts, ...',
+  },
+  {
+    id: 'manager',
+    label: 'Instance manager',
+    description:
+      'Logs of the CloudNativePG instance manager running next to Postgres: reconciliation, failover, quorum, backups, ...',
   },
   { id: 'other', label: 'Other', description: 'Everything else, e.g. application warnings' },
 ];
@@ -333,7 +341,8 @@ function identifySessions(
 /** Parses one pod's raw log chunks into Postgres log events, dropping non-record lines. */
 export function toPostgresEntries(pod: string, rawLines: string[]): PostgresLogEntry[] {
   const entries: PostgresLogEntry[] = [];
-  const records = parseCnpgLogLines(rawLines).flatMap(line =>
+  const parsed = parseCnpgLogLines(rawLines);
+  const records = parsed.flatMap(line =>
     line.record && line.logger === 'postgres' ? [{ ...line, record: line.record }] : []
   );
   const sessions = identifySessions(records);
@@ -410,6 +419,16 @@ export function toPostgresEntries(pod: string, rawLines: string[]): PostgresLogE
       .toLowerCase();
     entries.push(entry);
   }
+  for (const line of parsed) {
+    // Postgres lines without a record are the plain-text duplicates; everything else is the
+    // instance manager (or another CNPG component) logging on its own.
+    if (!line.record && line.logger !== 'postgres') {
+      const entry = toContainerEntry(pod, line, 'manager');
+      if (entry) {
+        entries.push(entry);
+      }
+    }
+  }
   return entries;
 }
 
@@ -441,41 +460,45 @@ function hashString(text: string): string {
  * Generic entries for a non-postgres container's structured lines. Lines without a timestamp
  * (plain text) are skipped: they can't be placed in time.
  */
-export function toContainerEntries(pod: string, rawLines: string[]): PostgresLogEntry[] {
-  const entries: PostgresLogEntry[] = [];
-  for (const line of parseCnpgLogLines(rawLines)) {
-    const time = parseTimestamp(line.ts)?.getTime();
-    if (time === undefined) {
-      continue;
-    }
-    const severity = normalizeSeverity(line.severity);
-    const fields = Object.entries(line.extra).map(
-      ([key, value]) => [key, formatLogValue(value)] as [string, string]
-    );
-    entries.push({
-      key: `${pod}|${line.ts}|${hashString(line.raw)}`,
-      pod,
-      time,
-      severity,
-      category: 'other',
-      message: line.message,
-      logger: line.logger,
-      pid: '',
-      fields,
-      raw: line.raw,
-      searchText: [
-        line.message,
-        pod,
-        severity,
-        line.logger,
-        ...fields.map(([key, value]) => `${key} ${value}`),
-      ]
-        .filter(Boolean)
-        .join('\n')
-        .toLowerCase(),
-    });
+function toContainerEntry(
+  pod: string,
+  line: ParsedLogLine,
+  category: LogCategory
+): PostgresLogEntry | undefined {
+  const time = parseTimestamp(line.ts)?.getTime();
+  if (time === undefined) {
+    return undefined;
   }
-  return entries;
+  const severity = normalizeSeverity(line.severity);
+  const fields = Object.entries(line.extra).map(
+    ([key, value]) => [key, formatLogValue(value)] as [string, string]
+  );
+  return {
+    key: `${pod}|${line.ts}|${hashString(line.raw)}`,
+    pod,
+    time,
+    severity,
+    category,
+    message: line.message,
+    logger: line.logger,
+    pid: '',
+    fields,
+    raw: line.raw,
+    searchText: [
+      line.message,
+      pod,
+      severity,
+      line.logger,
+      ...fields.map(([key, value]) => `${key} ${value}`),
+    ]
+      .filter(Boolean)
+      .join('\n')
+      .toLowerCase(),
+  };
+}
+
+export function toContainerEntries(pod: string, rawLines: string[]): PostgresLogEntry[] {
+  return parseCnpgLogLines(rawLines).flatMap(line => toContainerEntry(pod, line, 'other') ?? []);
 }
 
 export interface PodContainers {
