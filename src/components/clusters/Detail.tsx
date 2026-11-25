@@ -44,6 +44,12 @@ import { BackupPhaseLabel } from '../backups/List';
 import { CnpgLogo } from '../common/CnpgLogo';
 import { Pod, PodPhaseLabel, PodStatusLabel } from '../common/podActions';
 import { ViewLogsButton } from '../common/podLogs';
+import {
+  PortForwardButton,
+  PortForwardChip,
+  PortForwardEntry,
+  usePostgresPortForwards,
+} from '../common/podPortForward';
 import { OpenTerminalButton } from '../common/podTerminal';
 import {
   CHECKPOINTING,
@@ -394,7 +400,19 @@ function SummaryStrip({ cluster }: { cluster: Cluster }) {
   );
 }
 
-function InstanceNode({ pod, emphasis }: { pod: Pod; emphasis: 'primary' | 'standby' }) {
+function InstanceNode({
+  pod,
+  emphasis,
+  clusterName,
+  forward,
+  onForwardChanged,
+}: {
+  pod: Pod;
+  emphasis: 'primary' | 'standby';
+  clusterName: string;
+  forward?: PortForwardEntry;
+  onForwardChanged: () => void;
+}) {
   const isReady =
     pod.status.conditions?.some(c => c.type === 'Ready' && c.status === 'True') ?? false;
   return (
@@ -447,7 +465,15 @@ function InstanceNode({ pod, emphasis }: { pod: Pod; emphasis: 'primary' | 'stan
       <Box sx={{ mt: 0.5, display: 'flex', justifyContent: 'center', gap: 0.5 }}>
         <ViewLogsButton pod={pod} />
         <OpenTerminalButton pod={pod} />
+        <PortForwardButton
+          pod={pod}
+          clusterName={clusterName}
+          role={emphasis}
+          forward={forward}
+          onChanged={onForwardChanged}
+        />
       </Box>
+      {forward && <PortForwardChip label={`localhost:${forward.port}`} sx={{ mt: 0.5 }} />}
     </Box>
   );
 }
@@ -458,6 +484,10 @@ function ClusterTopology({ cluster }: { cluster: Cluster }) {
     labelSelector: `cnpg.io/cluster=${cluster.getName()},cnpg.io/podRole=instance`,
   });
 
+  const { forwards, refresh: refreshForwards } = usePostgresPortForwards(
+    cluster.cluster,
+    cluster.getNamespace()
+  );
   const sorted = useMemo(() => sortByName(pods), [pods]);
   const primaryName = cluster.currentPrimary;
   const primary = sorted.find(pod => pod.getName() === primaryName) ?? null;
@@ -478,7 +508,16 @@ function ClusterTopology({ cluster }: { cluster: Cluster }) {
         </Typography>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-          {primary && <InstanceNode key={primary.getName()} pod={primary} emphasis="primary" />}
+          {primary && (
+            <InstanceNode
+              key={primary.getName()}
+              pod={primary}
+              emphasis="primary"
+              clusterName={cluster.getName()}
+              forward={forwards.get(primary.getName())}
+              onForwardChanged={refreshForwards}
+            />
+          )}
           {standbys.length > 0 && (
             <>
               <Box
@@ -498,7 +537,14 @@ function ClusterTopology({ cluster }: { cluster: Cluster }) {
                 }}
               >
                 {standbys.map(pod => (
-                  <InstanceNode key={pod.getName()} pod={pod} emphasis="standby" />
+                  <InstanceNode
+                    key={pod.getName()}
+                    pod={pod}
+                    emphasis="standby"
+                    clusterName={cluster.getName()}
+                    forward={forwards.get(pod.getName())}
+                    onForwardChanged={refreshForwards}
+                  />
                 ))}
               </Box>
             </>
