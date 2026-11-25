@@ -45,6 +45,7 @@ export function useLogColors(): LogColors {
       server: pick('#6d4c41', '#bcaaa4'),
       standby: pick('#3949ab', '#7986cb'),
       errors: error,
+      manager: pick('#00897b', '#4db6ac'),
       other: pick('#757575', '#9e9e9e'),
     },
   };
