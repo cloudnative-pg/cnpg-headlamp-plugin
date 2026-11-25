@@ -51,6 +51,7 @@ List and detail views, plus a guided creation form.
 - **Fencing** support (mirroring `kubectl cnpg fencing on|off`): fence or unfence individual instances from the cluster's instance list, with an extra warning when fencing the primary
 - **Hibernation** support (mirroring `kubectl cnpg hibernate on|off`): hibernate a running cluster from its detail page or the cluster list to delete its instance pods while retaining storage, see hibernated clusters clearly marked (with their own summary count) in the list, and rehydrate them from the list
 - Leader-election **lease** details (holder, acquire/renew time, duration, transitions) alongside the cluster's main info
+- **Headlamp map** integration: each Cluster appears on the map as a single node with the CloudNativePG logo, connected to its instance Pods (and from them to their PVCs and Services) instead of showing up as anonymous Pod groups. A badge flags clusters that need attention, and selecting a node opens the full cluster view in the side panel. It is on by default under the "CloudNativePG" source in the map's source picker
 - Tabbed creation page (General, PostgreSQL, High Availability, Storage, Backup, YAML preview) with a configuration summary rail, on-demand dry-run validation, custom CNPG-I backup/recovery plugins, and GUC presets — including bootstrapping a new cluster from an existing backup
 
 ### Poolers (PgBouncer)

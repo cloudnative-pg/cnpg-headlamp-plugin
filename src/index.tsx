@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 
-import { registerRoute, registerSidebarEntry } from '@kinvolk/headlamp-plugin/lib';
+import {
+  registerKindIcon,
+  registerMapSource,
+  registerRoute,
+  registerSidebarEntry,
+} from '@kinvolk/headlamp-plugin/lib';
 import { BackupDetail } from './components/backups/Detail';
 import { BackupsList } from './components/backups/List';
 import { ClusterImageCatalogDetail } from './components/clusterimagecatalogs/Detail';
@@ -22,6 +27,7 @@ import { ClusterImageCatalogsList } from './components/clusterimagecatalogs/List
 import { CreateClusterPage } from './components/clusters/create/CreatePage';
 import { ClusterDetail } from './components/clusters/Detail';
 import { ClustersList } from './components/clusters/List';
+import { CnpgLogo } from './components/common/CnpgLogo';
 import { setupCnpgMenuIcon } from './components/common/cnpgMenuIcon';
 import { PodLogsPage } from './components/common/podLogs';
 import { PodTerminalPage } from './components/common/podTerminal';
@@ -42,6 +48,7 @@ import { ScheduledBackupsList } from './components/scheduledbackups/List';
 import { OperatorStatus } from './components/status/OperatorStatus';
 import { SubscriptionDetail } from './components/subscriptions/Detail';
 import { SubscriptionsList } from './components/subscriptions/List';
+import { CNPG_MAP_ICON_COLOR, cnpgMapSource } from './mapView';
 
 // Sidebar entry "name"s share one global namespace with Headlamp's own entries and every other
 // installed plugin — the same hazard as route names below. Bare 'Clusters'/'Backups'/'Status'
@@ -401,3 +408,13 @@ registerRoute({
   exact: true,
   component: () => <PodTerminalPage />,
 });
+
+registerMapSource(cnpgMapSource);
+
+// The map ignores a node's own `icon` for kube objects and reads this registry instead. The API
+// group keeps it from claiming Cluster API's `Cluster` kind.
+registerKindIcon(
+  'Cluster',
+  { icon: <CnpgLogo size="70%" />, color: CNPG_MAP_ICON_COLOR },
+  'postgresql.cnpg.io'
+);

@@ -1925,11 +1925,27 @@ function ClusterHeaderActions({ cluster }: { cluster: Cluster }) {
 
 export function ClusterDetail() {
   const { name, namespace } = useParams<{ name: string; namespace: string }>();
+  return <ClusterDetailView name={name} namespace={namespace} />;
+}
+
+/** Props instead of route params, so the map's side panel can render it. */
+export function ClusterDetailView({
+  name,
+  namespace,
+  kubeContext,
+  embedded = false,
+}: {
+  name: string;
+  namespace: string;
+  kubeContext?: string;
+  embedded?: boolean;
+}) {
   const selectedCluster = K8s.useCluster();
   const [activeTab, setActiveTab] = useState(0);
+  const clusterContext = kubeContext ?? selectedCluster ?? undefined;
 
   const [cluster, clusterError] = Cluster.useGet(name, namespace, {
-    cluster: selectedCluster ?? undefined,
+    cluster: clusterContext,
   });
 
   if (clusterError) {
@@ -1950,6 +1966,18 @@ export function ClusterDetail() {
   }
 
   if (cluster.isHibernated) {
+    if (embedded) {
+      // A redirect would navigate away from the map.
+      return (
+        <Box sx={{ p: 2 }}>
+          <Typography variant="h6">{cluster.getName()}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            This cluster is hibernated: its instance pods are deleted and only the storage is
+            retained. Rehydrate it from the Clusters list to resume.
+          </Typography>
+        </Box>
+      );
+    }
     // A hibernated cluster has no pods or meaningful status, so there is nothing for the detail
     // view to show — and rehydration lives on the cluster list anyway. Bounce there instead of
     // rendering empty tabs. (Unreachable in practice: the list doesn't link hibernated clusters
