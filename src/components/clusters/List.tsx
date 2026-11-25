@@ -19,6 +19,7 @@ import { SummaryBar, SummaryStat, useNamespaceScope } from '../common/ListHeader
 import { ClusterPortForwardChip } from '../common/podPortForward';
 import { StatusChip, StatusIcon } from '../common/SeverityStatus';
 import { getClusterCreateUrl } from './create/CreatePage';
+import { ForkClusterAction } from './fork';
 import { HibernateListAction } from './hibernate';
 
 // "Restore" lands on the same guided page as "Create Cluster", just pre-switched to the
@@ -170,6 +171,12 @@ const clusterColumns: (ResourceTableColumn<Cluster> | ColumnType)[] = [
 // `actions` inside each row's "⋮" menu, so the toggle uses the menu button style there.
 function clusterRowActions() {
   return [
+    {
+      id: 'cnpg-cluster-fork',
+      action: ({ item, closeMenu }: { item: Cluster; closeMenu?: () => void }) => (
+        <ForkClusterAction cluster={item} buttonStyle="menu" closeMenu={closeMenu} />
+      ),
+    },
     {
       id: 'cnpg-cluster-hibernate',
       action: ({ item, closeMenu }: { item: Cluster; closeMenu?: () => void }) => (

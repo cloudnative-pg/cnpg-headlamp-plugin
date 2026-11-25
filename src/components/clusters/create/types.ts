@@ -10,7 +10,12 @@ export const DEFAULT_RECOVERY_EXTERNAL_CLUSTER_NAME = 'recovery-source';
 export type ImageSource = 'default' | 'catalog' | 'imageName';
 export type CatalogKind = 'ImageCatalog' | 'ClusterImageCatalog';
 
-export type StartOption = 'empty' | 'barman-recovery' | 'klio-recovery' | 'custom-recovery';
+export type StartOption =
+  | 'empty'
+  | 'barman-recovery'
+  | 'klio-recovery'
+  | 'custom-recovery'
+  | 'clone-live';
 export type BackupKind = 'barman' | 'custom';
 export type SyncMethod = 'any' | 'first';
 export type SyncDataDurability = 'required' | 'preferred';
@@ -42,6 +47,14 @@ export interface ClusterCreateFormState {
   recoveryPluginParams: KVRow[];
   // Klio-plugin recovery: external cluster + a pluginconfigurations.klio.cnpg.io reference.
   recoveryPluginConfigurationRef: string;
+  // Clone-from-live-cluster (fork): the Cluster this one is forked from, same namespace. The
+  // source's spec is fetched and patched client-side (see buildCloneManifest) rather than
+  // modeled as form fields, since round-tripping an arbitrary existing spec through this form's
+  // narrower field set would silently drop anything the form doesn't know about.
+  cloneSourceNamespace: string;
+  cloneSourceName: string;
+  cloneAsReplica: boolean;
+  cloneSingleInstance: boolean;
   // PostgreSQL image.
   imageSource: ImageSource;
   imageName: string;
@@ -88,6 +101,10 @@ export function defaultFormState(): ClusterCreateFormState {
     recoveryPluginName: '',
     recoveryPluginParams: [],
     recoveryPluginConfigurationRef: '',
+    cloneSourceNamespace: '',
+    cloneSourceName: '',
+    cloneAsReplica: false,
+    cloneSingleInstance: false,
     imageSource: 'default',
     imageName: '',
     imageCatalogKind: 'ClusterImageCatalog',
@@ -134,15 +151,43 @@ export function recoverySearch(opts: RecoveryLinkOptions = {}): string {
   return `?${params.toString()}`;
 }
 
+export interface CloneLinkOptions {
+  namespace: string;
+  sourceName: string;
+}
+
+// Query string for a create-page link that opens on the clone-from-live-cluster start option,
+// pre-filled with the origin cluster's coordinates. Read back by initialFormStateFromSearch.
+// Linked from the "Fork cluster" action on the Cluster detail page.
+export function cloneSearch(opts: CloneLinkOptions): string {
+  const params = new URLSearchParams({
+    start: 'clone-live',
+    namespace: opts.namespace,
+    sourceName: opts.sourceName,
+  });
+  return `?${params.toString()}`;
+}
+
 // Builds the create form's initial state from the page's query string. ?start=recovery (linked
 // from the list page's "Restore" action and the ObjectStore page's per-server "Recover" action)
 // lands directly on the barman-guided recovery start option; the optional namespace, objectStore
 // and serverName params pre-fill it. The namespace must be the ObjectStore's own, since the
-// ObjectStore picker only lists stores from the selected namespace.
+// ObjectStore picker only lists stores from the selected namespace. ?start=clone-live (linked from
+// the Cluster detail page's "Fork cluster" action) lands on the clone-from-live-cluster start
+// option, pinned to the source cluster's namespace and name.
 export function initialFormStateFromSearch(search: string): ClusterCreateFormState {
   const state = defaultFormState();
   const params = new URLSearchParams(search);
-  if (params.get('start') !== 'recovery') {
+  const start = params.get('start');
+  if (start === 'clone-live') {
+    const namespace = params.get('namespace') ?? '';
+    state.startOption = 'clone-live';
+    state.namespace = namespace;
+    state.cloneSourceNamespace = namespace;
+    state.cloneSourceName = params.get('sourceName') ?? '';
+    return state;
+  }
+  if (start !== 'recovery') {
     return state;
   }
   state.startOption = 'barman-recovery';
@@ -344,6 +389,77 @@ export function buildClusterManifest(state: ClusterCreateFormState) {
   };
 }
 
+// spec keys dropped from the source cluster's spec before patching it for the fork: bootstrap
+// and externalClusters are replaced outright below; replica, certificates and superuserSecret
+// name the *source's own* upstream relationship and per-cluster secrets, so carrying them over
+// would point the new cluster at the wrong CN/secrets instead of letting it generate its own.
+const CLONE_SPEC_KEYS_DROPPED = [
+  'bootstrap',
+  'externalClusters',
+  'replica',
+  'certificates',
+  'superuserSecret',
+];
+
+// The external cluster entry added to a forked cluster's spec, pointing at the source cluster's
+// primary via its -rw service. CNPG's streaming_replica user authenticates over mTLS, not a
+// password, so this references the source's own replication client-cert and CA secrets by name
+// rather than a user/password pair — all three already exist in the shared namespace. Shape
+// mirrors cloudnative-pg's own cluster-replica-tls.yaml sample: host/user/sslmode/dbname nest
+// under connectionParameters (the operator rejects an externalCluster entry that sets them at
+// the top level — one of connectionParameters, plugin or barmanObjectStore is required there).
+export function buildCloneExternalCluster(sourceNamespace: string, sourceName: string) {
+  return {
+    name: sourceName,
+    connectionParameters: {
+      host: `${sourceName}-rw.${sourceNamespace}.svc`,
+      user: 'streaming_replica',
+      sslmode: 'verify-full',
+      dbname: 'postgres',
+    },
+    sslKey: { name: `${sourceName}-replication`, key: 'tls.key' },
+    sslCert: { name: `${sourceName}-replication`, key: 'tls.crt' },
+    sslRootCert: { name: `${sourceName}-ca`, key: 'ca.crt' },
+  };
+}
+
+// Builds a forked Cluster manifest by patching the *actual* source spec rather than projecting
+// it through ClusterCreateFormState: the guided form only models a curated subset of the spec,
+// so round-tripping an arbitrary existing cluster through it would silently drop any field the
+// form doesn't know about (affinity, resources, probes, monitoring, ...). sourceSpec is the
+// fetched source Cluster's spec.
+export function buildCloneManifest(sourceSpec: Record<string, any>, state: ClusterCreateFormState) {
+  const spec: Record<string, any> = JSON.parse(JSON.stringify(sourceSpec ?? {}));
+  for (const key of CLONE_SPEC_KEYS_DROPPED) {
+    delete spec[key];
+  }
+
+  const sourceName = state.cloneSourceName.trim();
+  spec.bootstrap = { pg_basebackup: { source: sourceName } };
+  spec.externalClusters = [buildCloneExternalCluster(state.cloneSourceNamespace, sourceName)];
+  if (state.cloneSingleInstance) {
+    spec.instances = 1;
+    delete spec.minSyncReplicas;
+    delete spec.maxSyncReplicas;
+    if (spec.postgresql) {
+      delete spec.postgresql.synchronous;
+    }
+  }
+  if (state.cloneAsReplica) {
+    // Matches cloudnative-pg's cluster-replica-tls.yaml sample: `self` is left unset (defaults
+    // to this cluster's own name), so naming the source as `primary` is what makes this cluster
+    // a replica of it rather than a symmetric peer.
+    spec.replica = { primary: sourceName, source: sourceName };
+  }
+
+  return {
+    apiVersion: 'postgresql.cnpg.io/v1',
+    kind: 'Cluster',
+    metadata: { name: state.name, namespace: state.cloneSourceNamespace },
+    spec,
+  };
+}
+
 export interface ClusterSummary {
   name: string;
   image: string;
@@ -395,7 +511,11 @@ export function deriveSummary(state: ClusterCreateFormState): ClusterSummary {
       ? 'recovery via barman'
       : state.startOption === 'klio-recovery'
       ? 'recovery via klio'
-      : 'recovery via custom plugin';
+      : state.startOption === 'custom-recovery'
+      ? 'recovery via custom plugin'
+      : state.cloneAsReplica
+      ? `replica of ${state.cloneSourceName || '?'}`
+      : `fork of ${state.cloneSourceName || '?'}`;
 
   const params = collectParameters(state);
   const parameters =
@@ -462,6 +582,9 @@ export function getValidationErrors(state: ClusterCreateFormState): string[] {
     if (!state.recoveryExternalClusterName.trim() || !state.recoveryPluginName.trim()) {
       errors.push('External cluster name and plugin name are required for custom recovery.');
     }
+  }
+  if (state.startOption === 'clone-live' && !state.cloneSourceName.trim()) {
+    errors.push('Clone source cluster is required.');
   }
   if (state.backupEnabled && state.backupKind === 'barman' && !state.backupObjectStoreName) {
     errors.push('Backup ObjectStore is required when Barman backups are enabled.');
