@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.8 (2026-11-26)
+
+## What's Changed
+* chore: release v0.1.7 by @cnpg-bot in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/171
+* feat(clusters): Add Logs tab with insights and a filterable log stream by @YogeshJain96 in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/169
+* chore(deps): update dependency cronstrue to v3.48.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/173
+* feat(clusters): add PostgreSQL configuration editor by @leonardoce in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/174
+* chore(deps): update dependency @types/node to v26.6.7 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/176
+* chore(deps): update dependency cronstrue to v3.50.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/177
+* feat(clusters): add a port-forward action to cluster instances by @TamaraNocentini in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/175
+* chore(deps): update dependency @types/node to v26.6.9 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/178
+* feat(logs): show instance manager lines in the cluster logs tab by @leonardoce in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/179
+* chore(deps): update dependency @types/node to v26.6.10 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/181
+* feat(clusters): show Clusters with the CNPG logo in the Headlamp map by @YogeshJain96 in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/180
+* chore(deps): update dependency vitest to v5.1.2 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/182
+* chore(deps): update dependency cronstrue to v3.51.0 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/183
+* chore(deps): update dependency @types/node to v26.6.11 by @renovate[bot] in https://github.com/cloudnative-pg/cnpg-headlamp-plugin/pull/185
+
+
+**Full Changelog**: https://github.com/cloudnative-pg/cnpg-headlamp-plugin/compare/v0.1.7...v0.1.8
+
 ## 0.1.7 (2026-11-22)
 
 ## What's Changed
