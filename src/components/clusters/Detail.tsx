@@ -78,6 +78,7 @@ import {
 } from '../scheduledbackups/List';
 import { launchConnectActivity } from './connect';
 import { FenceAction } from './fence';
+import { ForkClusterAction } from './fork';
 import { HibernateDetailAction } from './hibernate';
 import { LogsTab } from './logs/LogsTab';
 import { PostgresqlConfigSection } from './postgresqlConfig/PostgresqlConfigSection';
@@ -1915,6 +1916,7 @@ function ClusterHeaderActions({ cluster }: { cluster: Cluster }) {
           )
         }
       />
+      <ForkClusterAction cluster={cluster} />
       <EditButton item={cluster} />
       <DeleteButton item={cluster} />
       <ScaleAction cluster={cluster} />

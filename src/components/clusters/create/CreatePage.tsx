@@ -28,8 +28,11 @@ import { StorageSizeClassFields } from '../../common/StorageSizeClassFields';
 import { YamlPreview } from '../../common/YamlPreview';
 import {
   BackupKind,
+  buildCloneManifest,
   buildClusterManifest,
   CatalogKind,
+  CloneLinkOptions,
+  cloneSearch,
   ClusterCreateFormState,
   collectParameters,
   deriveSummary,
@@ -338,13 +341,9 @@ function GeneralTab({
                 value={state.startOption}
                 onChange={e => update({ startOption: e.target.value as StartOption })}
               >
-                <MenuItem value="barman-recovery">
-                  Barman Cloud plugin
-                </MenuItem>
+                <MenuItem value="barman-recovery">Barman Cloud plugin</MenuItem>
                 <MenuItem value="klio-recovery">Klio plugin</MenuItem>
-                <MenuItem value="custom-recovery">
-                  Custom plugin
-                </MenuItem>
+                <MenuItem value="custom-recovery">Custom plugin</MenuItem>
               </Select>
             </FormControl>
 
@@ -460,6 +459,77 @@ function GeneralTab({
         )}
       </SectionBox>
     </>
+  );
+}
+
+// Minimal start-from-scratch of the clone flow: the rest of the spec comes verbatim from the
+// source cluster (see buildCloneManifest), so this only asks for what the source doesn't
+// determine — the new name and whether to keep streaming from the source afterwards.
+function CloneTab({
+  state,
+  update,
+  originCluster,
+  originError,
+}: {
+  state: ClusterCreateFormState;
+  update: UpdateFn;
+  originCluster: Cluster | null;
+  originError: unknown;
+}) {
+  const nameInvalid = !!state.name && !NAME_PATTERN.test(state.name);
+
+  return (
+    <SectionBox headerProps={{ headerStyle: 'normal' }} title="Fork from a live cluster">
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Source:{' '}
+        <strong>
+          {state.cloneSourceNamespace}/{state.cloneSourceName}
+        </strong>
+      </Typography>
+      {originError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Failed to load the source cluster: {String(originError)}
+        </Alert>
+      )}
+      {!originCluster && !originError && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Loading the source cluster's spec…
+        </Alert>
+      )}
+      <TextField
+        fullWidth
+        margin="normal"
+        label={<RequiredLabel label="New cluster name" required />}
+        value={state.name}
+        onChange={e => update({ name: e.target.value })}
+        error={nameInvalid}
+        helperText={
+          nameInvalid
+            ? 'Lowercase letters, numbers and hyphens only.'
+            : `Created in ${state.cloneSourceNamespace}, the source cluster's namespace.`
+        }
+      />
+      <FormControlLabel
+        sx={{ display: 'flex', mt: 2 }}
+        control={
+          <Checkbox
+            checked={state.cloneAsReplica}
+            onChange={e => update({ cloneAsReplica: e.target.checked })}
+          />
+        }
+        label="Keep streaming as a replica cluster (continuous standby of the source, promotable later) instead of a one-shot fork"
+      />
+      <FormControlLabel
+        sx={{ display: 'flex' }}
+        control={
+          <Checkbox
+            checked={state.cloneSingleInstance}
+            onChange={e => update({ cloneSingleInstance: e.target.checked })}
+          />
+        }
+        label="Single instance (cheaper — for inspection/testing) instead of matching the source's instance count"
+      />
+    </SectionBox>
   );
 }
 
@@ -975,6 +1045,14 @@ export function CreateClusterPage() {
   const [dryRunValidating, setDryRunValidating] = useState(false);
 
   const rowIdCounter = useRef(0);
+  const isClone = state.startOption === 'clone-live';
+
+  // Only fetched while in the clone flow — buildCloneManifest patches this cluster's actual
+  // spec rather than anything the form itself tracks.
+  const [originCluster, originError] = Cluster.useGet(
+    state.cloneSourceName,
+    state.cloneSourceNamespace
+  );
 
   function update(patch: Partial<ClusterCreateFormState>) {
     setState(prev => ({ ...prev, ...patch }));
@@ -985,13 +1063,21 @@ export function CreateClusterPage() {
     return `row-${rowIdCounter.current}`;
   }
 
-  const manifest = useMemo(() => buildClusterManifest(state), [state]);
+  const manifest = useMemo(() => {
+    if (!isClone) {
+      return buildClusterManifest(state);
+    }
+    return originCluster ? buildCloneManifest(originCluster.spec, state) : null;
+  }, [state, isClone, originCluster]);
   const summary = useMemo(() => deriveSummary(state), [state]);
   const errors = useMemo(() => getValidationErrors(state), [state]);
   const paramsEmpty = useMemo(() => Object.keys(collectParameters(state)).length === 0, [state]);
-  const canSubmit = errors.length === 0 && !submitting;
+  const canSubmit = errors.length === 0 && !submitting && manifest !== null;
 
   async function handleValidate() {
+    if (!manifest) {
+      return;
+    }
     setDryRunValidating(true);
     setDryRun({ status: 'validating' });
     const result = await validateDryRun(manifestOverride ?? manifest, (body, queryParams) =>
@@ -1002,7 +1088,7 @@ export function CreateClusterPage() {
   }
 
   async function handleSubmit() {
-    if (!canSubmit) {
+    if (!canSubmit || !manifest) {
       return;
     }
     setSubmitting(true);
@@ -1038,7 +1124,11 @@ export function CreateClusterPage() {
       }}
     >
       <Typography variant="h1" component="h1" sx={{ mb: 2 }}>
-        {state.startOption === 'empty' ? 'New Cluster' : 'Restore Cluster'}
+        {state.startOption === 'empty'
+          ? 'New Cluster'
+          : isClone
+          ? 'Fork Cluster'
+          : 'Restore Cluster'}
       </Typography>
 
       <Box
@@ -1053,11 +1143,11 @@ export function CreateClusterPage() {
           variant="scrollable"
           scrollButtons="auto"
         >
-          <Tab value="general" label="General" />
-          <Tab value="postgres" label="PostgreSQL" />
-          <Tab value="ha" label="High Availability" />
-          <Tab value="storage" label="Storage" />
-          <Tab value="backup" label="Backup" />
+          <Tab value="general" label={isClone ? 'Clone' : 'General'} />
+          {!isClone && <Tab value="postgres" label="PostgreSQL" />}
+          {!isClone && <Tab value="ha" label="High Availability" />}
+          {!isClone && <Tab value="storage" label="Storage" />}
+          {!isClone && <Tab value="backup" label="Backup" />}
           <Tab value="yaml" label="YAML Preview" sx={{ fontWeight: 700 }} />
         </Tabs>
       </Box>
@@ -1072,15 +1162,25 @@ export function CreateClusterPage() {
         }}
       >
         <Box sx={{ minWidth: 0 }}>
-          {tab === 'general' && <GeneralTab {...tabProps} goToTab={setTab} />}
-          {tab === 'postgres' && <PostgresTab {...tabProps} />}
-          {tab === 'ha' && <HATab {...tabProps} />}
-          {tab === 'storage' && <StorageTab {...tabProps} />}
-          {tab === 'backup' && <BackupTab {...tabProps} />}
+          {tab === 'general' &&
+            (isClone ? (
+              <CloneTab
+                state={state}
+                update={update}
+                originCluster={originCluster}
+                originError={originError}
+              />
+            ) : (
+              <GeneralTab {...tabProps} goToTab={setTab} />
+            ))}
+          {!isClone && tab === 'postgres' && <PostgresTab {...tabProps} />}
+          {!isClone && tab === 'ha' && <HATab {...tabProps} />}
+          {!isClone && tab === 'storage' && <StorageTab {...tabProps} />}
+          {!isClone && tab === 'backup' && <BackupTab {...tabProps} />}
           {tab === 'yaml' && (
             <SectionBox headerProps={{ headerStyle: 'normal' }} title="YAML Preview">
               <YamlPreview
-                manifest={manifest}
+                manifest={manifest ?? {}}
                 onOverrideChange={setManifestOverride}
                 defaultExpanded
               />
@@ -1110,18 +1210,24 @@ export function CreateClusterPage() {
               fontSize: 13,
             }}
           >
-            {(
-              [
-                ['Name', summary.name],
-                ['Image', summary.image],
-                ['Instances', summary.instances],
-                ['Replication', summary.replication],
-                ['Storage', summary.storage],
-                ['Backup', summary.backup],
-                ['Start', summary.start],
-                ['Parameters', summary.parameters],
-              ] as [string, string][]
-            ).map(([term, value]) => (
+            {(isClone
+              ? [
+                  ['Name', summary.name],
+                  ['Source', `${state.cloneSourceNamespace}/${state.cloneSourceName}`],
+                  ['Mode', summary.start],
+                  ['Instances', state.cloneSingleInstance ? '1 (forced)' : 'same as source'],
+                ]
+              : [
+                  ['Name', summary.name],
+                  ['Image', summary.image],
+                  ['Instances', summary.instances],
+                  ['Replication', summary.replication],
+                  ['Storage', summary.storage],
+                  ['Backup', summary.backup],
+                  ['Start', summary.start],
+                  ['Parameters', summary.parameters],
+                ]
+            ).map(([term, value]: [string, string]) => (
               <Box key={term} sx={{ display: 'contents' }}>
                 <Typography component="dt" variant="body2" color="text.secondary">
                   {term}
@@ -1136,7 +1242,7 @@ export function CreateClusterPage() {
               </Box>
             ))}
           </Box>
-          {paramsEmpty && (
+          {!isClone && paramsEmpty && (
             <Alert severity="info" sx={{ mt: 2 }}>
               No PostgreSQL parameters set — operator defaults will apply.
             </Alert>
@@ -1165,7 +1271,7 @@ export function CreateClusterPage() {
             <Button
               variant="outlined"
               size="small"
-              disabled={dryRunValidating}
+              disabled={dryRunValidating || !manifest}
               onClick={handleValidate}
             >
               Validate via dry-run
@@ -1186,7 +1292,11 @@ export function CreateClusterPage() {
                 disabled={!canSubmit}
                 onClick={handleSubmit}
               >
-                {state.startOption === 'empty' ? 'Create cluster' : 'Restore cluster'}
+                {state.startOption === 'empty'
+                  ? 'Create cluster'
+                  : isClone
+                  ? 'Fork cluster'
+                  : 'Restore cluster'}
               </Button>
             </AuthDisabledButton>
           </Box>
@@ -1199,4 +1309,9 @@ export function CreateClusterPage() {
 export function getClusterCreateUrl(opts?: { start?: 'recovery' } & RecoveryLinkOptions): string {
   const base = createRouteURL('CNPG Cluster New');
   return opts?.start === 'recovery' ? `${base}${recoverySearch(opts)}` : base;
+}
+
+// Linked from the Cluster detail page's "Fork cluster" action.
+export function getClusterCloneUrl(opts: CloneLinkOptions): string {
+  return `${createRouteURL('CNPG Cluster New')}${cloneSearch(opts)}`;
 }

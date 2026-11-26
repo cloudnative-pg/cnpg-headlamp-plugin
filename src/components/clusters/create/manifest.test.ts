@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   BARMAN_CLOUD_PLUGIN_NAME,
+  buildCloneManifest,
   buildClusterManifest,
+  cloneSearch,
   collectParameters,
   defaultFormState,
   deriveSummary,
@@ -353,6 +355,122 @@ describe('recovery create-page links', () => {
         ],
       },
     });
+  });
+});
+
+describe('buildCloneManifest', () => {
+  const sourceSpec = {
+    instances: 3,
+    storage: { size: '10Gi' },
+    postgresql: { parameters: { max_connections: '200' } },
+    bootstrap: { recovery: { source: 'some-old-source' } },
+    externalClusters: [{ name: 'some-old-source', plugin: { name: 'irrelevant.cnpg.io' } }],
+    replica: { enabled: true, source: 'upstream-cluster' },
+    certificates: { serverTLSSecret: 'origin-server', replicationTLSSecret: 'origin-replication' },
+    superuserSecret: { name: 'origin-superuser' },
+  };
+
+  function cloneState(overrides: Partial<ReturnType<typeof defaultFormState>> = {}) {
+    return {
+      ...defaultFormState(),
+      startOption: 'clone-live' as const,
+      cloneSourceNamespace: 'cnpg',
+      cloneSourceName: 'origin',
+      name: 'forked-db',
+      ...overrides,
+    };
+  }
+
+  it('drops the source-specific spec keys and keeps the rest verbatim', () => {
+    const manifest = buildCloneManifest(sourceSpec, cloneState());
+    expect(manifest.spec).not.toHaveProperty('replica');
+    expect(manifest.spec).not.toHaveProperty('certificates');
+    expect(manifest.spec).not.toHaveProperty('superuserSecret');
+    expect(manifest.spec.instances).toBe(3);
+    expect(manifest.spec.storage).toEqual({ size: '10Gi' });
+    expect(manifest.spec.postgresql).toEqual({ parameters: { max_connections: '200' } });
+  });
+
+  it('bootstraps via pg_basebackup from the source, replacing any inherited externalClusters', () => {
+    const manifest = buildCloneManifest(sourceSpec, cloneState());
+    expect(manifest.spec.bootstrap).toEqual({ pg_basebackup: { source: 'origin' } });
+    expect(manifest.spec.externalClusters).toEqual([
+      {
+        name: 'origin',
+        connectionParameters: {
+          host: 'origin-rw.cnpg.svc',
+          user: 'streaming_replica',
+          sslmode: 'verify-full',
+          dbname: 'postgres',
+        },
+        sslKey: { name: 'origin-replication', key: 'tls.key' },
+        sslCert: { name: 'origin-replication', key: 'tls.crt' },
+        sslRootCert: { name: 'origin-ca', key: 'ca.crt' },
+      },
+    ]);
+  });
+
+  it('omits spec.replica for a one-shot fork', () => {
+    const manifest = buildCloneManifest(sourceSpec, cloneState({ cloneAsReplica: false }));
+    expect(manifest.spec).not.toHaveProperty('replica');
+  });
+
+  it('sets spec.replica pointing at the source when kept as a replica cluster', () => {
+    const manifest = buildCloneManifest(sourceSpec, cloneState({ cloneAsReplica: true }));
+    expect(manifest.spec.replica).toEqual({ primary: 'origin', source: 'origin' });
+  });
+
+  it('names the new cluster in the source namespace', () => {
+    const manifest = buildCloneManifest(sourceSpec, cloneState());
+    expect(manifest.metadata).toEqual({ name: 'forked-db', namespace: 'cnpg' });
+  });
+
+  it('does not mutate the source spec it was given', () => {
+    const original = JSON.parse(JSON.stringify(sourceSpec));
+    buildCloneManifest(sourceSpec, cloneState());
+    expect(sourceSpec).toEqual(original);
+  });
+
+  it('respects the source instance count by default', () => {
+    const manifest = buildCloneManifest(sourceSpec, cloneState());
+    expect(manifest.spec.instances).toBe(3);
+  });
+
+  it('forces a single instance and drops sync replication when requested', () => {
+    const manifest = buildCloneManifest(
+      { ...sourceSpec, postgresql: { synchronous: { method: 'any', number: 1 } } },
+      cloneState({ cloneSingleInstance: true })
+    );
+    expect(manifest.spec.instances).toBe(1);
+    expect(manifest.spec.postgresql).not.toHaveProperty('synchronous');
+  });
+});
+
+describe('clone create-page links', () => {
+  it('builds a query string carrying the source coordinates', () => {
+    expect(cloneSearch({ namespace: 'cnpg', sourceName: 'origin' })).toBe(
+      '?start=clone-live&namespace=cnpg&sourceName=origin'
+    );
+  });
+
+  it('lands on the clone-live start option pinned to the source namespace and name', () => {
+    expect(
+      initialFormStateFromSearch(cloneSearch({ namespace: 'cnpg', sourceName: 'origin' }))
+    ).toEqual({
+      ...defaultFormState(),
+      startOption: 'clone-live',
+      namespace: 'cnpg',
+      cloneSourceNamespace: 'cnpg',
+      cloneSourceName: 'origin',
+    });
+  });
+
+  it('leaves only the new cluster name for the user to fill in', () => {
+    const state = initialFormStateFromSearch(
+      cloneSearch({ namespace: 'cnpg', sourceName: 'origin' })
+    );
+    expect(getValidationErrors(state)).toEqual(['Name is required.']);
+    expect(getValidationErrors({ ...state, name: 'forked-db' })).toEqual([]);
   });
 });
 

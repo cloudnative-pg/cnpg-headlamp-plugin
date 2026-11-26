@@ -53,6 +53,7 @@ List and detail views, plus a guided creation form.
 - Leader-election **lease** details (holder, acquire/renew time, duration, transitions) alongside the cluster's main info
 - **Headlamp map** integration: each Cluster appears on the map as a single node with the CloudNativePG logo, connected to its instance Pods (and from them to their PVCs and Services) instead of showing up as anonymous Pod groups. A badge flags clusters that need attention, and selecting a node opens the full cluster view in the side panel. It is on by default under the "CloudNativePG" source in the map's source picker
 - Tabbed creation page (General, PostgreSQL, High Availability, Storage, Backup, YAML preview) with a configuration summary rail, on-demand dry-run validation, custom CNPG-I backup/recovery plugins, and GUC presets — including bootstrapping a new cluster from an existing backup
+- A **Fork cluster** action on the cluster detail page and in each row of the cluster list: creates a new cluster in the same namespace by streaming a live `pg_basebackup` from the current one (via `streaming_replica`'s client certificate, no object store needed). Options to keep it as a continuously-streaming, promotable replica cluster instead of a one-shot copy, and to force a single instance regardless of the source's instance count (cheaper, for inspection/testing). The generated spec is shown for review/editing before creation
 
 ### Poolers (PgBouncer)
 
