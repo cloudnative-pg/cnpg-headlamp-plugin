@@ -46,7 +46,7 @@ const flag = name => {
 if (flag('help') || args.includes('-h')) {
   console.log(`Usage: node scripts/cdp-screenshots.mjs [cluster-name] [--out=img] [--only=a,b,c]
 
-Shots: operator-status, cluster-list, cluster-detail, cluster-logs, cluster-form,
+Shots: operator-status, cluster-list, cluster-detail, cluster-logs, cluster-map, cluster-form,
        scheduled-backup-list, database-detail
 Env: CDP_URL, HEADLAMP_CLUSTER, SCREENSHOTS_WIDTH/HEIGHT/SCALE, SCREENSHOTS_THEME (light|dark, default light), OUT_DIR`);
   process.exit(0);
@@ -320,6 +320,26 @@ const shots = [
       await waitFor(`!!document.querySelector('[aria-label="Log details"]')`, { timeoutMs: 5000 });
       await sleep(800);
       await capture(`${OUT_DIR}/cluster-logs.png`);
+    },
+  },
+  {
+    name: 'cluster-map',
+    run: async () => {
+      // The demo namespace on Headlamp's Map, with the Cluster expanded.
+      await navigateAndSettle(`/c/${CLUSTER}/map?namespace=cnpg-demo`);
+      const CHIP = `Array.from(document.querySelectorAll('.MuiChip-root')).find(c => c.textContent.trim() === 'Expand All')`;
+      if (!(await waitFor(`!!(${CHIP})`, { timeoutMs: 20000 }))) {
+        throw new Error('The Map did not load');
+      }
+      // Click it only when it is off (an "on" chip shows a check mark).
+      await evaluate(`(() => { const c = ${CHIP}; if (!c.querySelector('svg')) c.click(); })()`);
+      const ready = await waitFor(`document.querySelectorAll('.react-flow__node').length >= 10`, {
+        timeoutMs: 20000,
+      });
+      if (!ready) throw new Error('Map shows no Cluster — run screenshots/demo.sh create first?');
+      await evaluate(`document.querySelector('.react-flow__controls-fitview')?.click()`);
+      await sleep(1500);
+      await capture(`${OUT_DIR}/cluster-map.png`);
     },
   },
   {
