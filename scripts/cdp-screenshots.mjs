@@ -4,7 +4,7 @@
  *
  * Same setup as scripts/cdp-verify.mjs — no dependencies, node's built-in
  * WebSocket + fetch only. The demo data comes from screenshots/cnpg-demo.yaml
- * (see screenshots/seed-demo.sh); any cluster works, but shots are only
+ * (created by screenshots/demo.sh); any cluster works, but shots are only
  * "interesting" once that demo namespace exists and the instances are Running.
  *
  * Usage:
@@ -18,14 +18,14 @@
  *      to same-origin and trips the Plugin Development Mode gate, so dev-dir
  *      plugins silently stop loading. Plain Chrome fetches plugins directly
  *      from the backend :4466 instead.)
- *   3. ./screenshots/seed-demo.sh --wait          # once per cluster
+ *   3. ./screenshots/demo.sh create               # once per cluster
  *   4. node scripts/cdp-screenshots.mjs [headlamp-cluster-name] [--out=img] [--only=a,b,c]
  *
  * The cluster name defaults to HEADLAMP_CLUSTER, else whatever cluster the open
  * page is already on, else the first `#/c/<name>/` link found in the DOM.
  *
- * Viewport is fixed (1440x900 @2x) so re-runs produce same-size shots regardless
- * of the laptop driving them. Captures are full-page (captureBeyondViewport).
+ * The viewport (1440x900 @2x) and the color scheme (light) are fixed, so every run
+ * gives the same shots. Captures are full-page (captureBeyondViewport).
  */
 
 import fs from 'node:fs/promises';
@@ -35,6 +35,7 @@ const CDP_HTTP = process.env.CDP_URL || 'http://localhost:9222';
 const VIEWPORT_W = parseInt(process.env.SCREENSHOTS_WIDTH || '1440', 10);
 const VIEWPORT_H = parseInt(process.env.SCREENSHOTS_HEIGHT || '900', 10);
 const SCALE = parseFloat(process.env.SCREENSHOTS_SCALE || '2');
+const THEME = process.env.SCREENSHOTS_THEME || 'light';
 
 const args = process.argv.slice(2);
 const flag = name => {
@@ -45,9 +46,9 @@ const flag = name => {
 if (flag('help') || args.includes('-h')) {
   console.log(`Usage: node scripts/cdp-screenshots.mjs [cluster-name] [--out=img] [--only=a,b,c]
 
-Shots: operator-status, cluster-list, cluster-detail, cluster-form,
+Shots: operator-status, cluster-list, cluster-detail, cluster-logs, cluster-form,
        scheduled-backup-list, database-detail
-Env: CDP_URL, HEADLAMP_CLUSTER, SCREENSHOTS_WIDTH/HEIGHT/SCALE, OUT_DIR`);
+Env: CDP_URL, HEADLAMP_CLUSTER, SCREENSHOTS_WIDTH/HEIGHT/SCALE, SCREENSHOTS_THEME (light|dark, default light), OUT_DIR`);
   process.exit(0);
 }
 const OUT_DIR = flag('out') === true ? 'img' : flag('out') || process.env.OUT_DIR || 'img';
@@ -105,11 +106,19 @@ await new Promise(r => ws.addEventListener('open', r, { once: true }));
 await send('Runtime.enable');
 await send('Page.enable');
 // Fixed viewport => deterministic shot dimensions regardless of the driving laptop.
-await send('Emulation.setDeviceMetricsOverride', {
-  width: VIEWPORT_W,
-  height: VIEWPORT_H,
-  deviceScaleFactor: SCALE,
-  mobile: false,
+let viewportHeight = VIEWPORT_H;
+const setViewport = async height => {
+  viewportHeight = height;
+  await send('Emulation.setDeviceMetricsOverride', {
+    width: VIEWPORT_W,
+    height,
+    deviceScaleFactor: SCALE,
+    mobile: false,
+  });
+};
+await setViewport(VIEWPORT_H);
+await send('Emulation.setEmulatedMedia', {
+  features: [{ name: 'prefers-color-scheme', value: THEME }],
 });
 
 const HEADING_SELECTOR = 'h1, h2, [class*="SectionHeader"]';
@@ -125,8 +134,9 @@ const currentHeading = () =>
 // back to a full page load for link-less routes (e.g. the /clusters/new create form, which
 // has no sidebar entry to click).
 const routerKind = await evaluate(`(() => {
-  if ((window.location.hash || '').startsWith('#/c/')) return 'hash';
-  if (document.querySelector('a[href^=\"#/c/\"]')) return 'hash';
+  if (window.location.protocol === 'file:') return 'hash';
+  if ((window.location.hash || '').startsWith('#/')) return 'hash';
+  if (document.querySelector('a[href*=\"#/c/\"]')) return 'hash';
   return 'browser';
 })()`);
 console.log(`Router: ${routerKind}`);
@@ -160,13 +170,19 @@ const navigateAndSettle = async path => {
   );
   // One extra beat for MUI Collapse/table virtualization to finish painting.
   await sleep(800);
+  const here = await evaluate('window.location.href');
+  if (!here.includes(path.replace(/\/$/, ''))) {
+    throw new Error(`Could not open ${path} (Headlamp is on ${here})`);
+  }
 };
 
+// Crop to the viewport, so a bigger window adds no empty margin.
 const capture = async file => {
   const { data } = await send('Page.captureScreenshot', {
     format: 'png',
     captureBeyondViewport: true,
     fromSurface: true,
+    clip: { x: 0, y: 0, width: VIEWPORT_W, height: viewportHeight, scale: 1 },
   });
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, Buffer.from(data, 'base64'));
@@ -192,19 +208,34 @@ console.log(`Cluster: ${CLUSTER}  (${VIEWPORT_W}x${VIEWPORT_H} @${SCALE}x -> ${O
 // Land in cluster context first: Headlamp only renders this plugin's routes/sidebar there.
 await navigateAndSettle(`/c/${CLUSTER}/cnpg/status`);
 
+// Headlamp's own theme setting can override ours, so check.
+const isDark = await evaluate(`(() => {
+  const [r, g, b] = getComputedStyle(document.body).backgroundColor.match(/\\d+/g).map(Number);
+  return 0.299 * r + 0.587 * g + 0.114 * b < 128;
+})()`);
+if (isDark !== (THEME === 'dark')) {
+  throw new Error(
+    `Headlamp shows the ${isDark ? 'dark' : 'light'} theme but ${THEME} was asked for. ` +
+      `In Headlamp, open Settings > General > Theme, pick ${THEME === 'dark' ? 'Dark' : 'Light'} ` +
+      `(or Use system) and run this again.`
+  );
+}
+
 // Detail links: prefer the demo objects (stable names for stable shots), else first row link.
 // Navigates to the list first — discovery reads the current DOM, so it must run there.
-// Returned hrefs are normalized to plain paths (no leading '#') for navigateAndSettle.
+// Returned hrefs are plain paths, for navigateAndSettle.
 const detailHrefFromList = async (listPath, preferred, regexSrc) => {
   await navigateAndSettle(listPath);
   return evaluate(`(() => {
     const links = Array.from(document.querySelectorAll('a[href]'))
       .map(a => a.getAttribute('href') || '');
+    const clean = h =>
+      h.includes('#') ? h.slice(h.indexOf('#') + 1) : h.replace(/^[a-z]+:\\/\\/[^/]*/i, '');
     const pref = links.find(h => h.includes(${JSON.stringify(preferred)}));
-    if (pref) return pref.replace(/^#/, '');
+    if (pref) return clean(pref);
     const re = new RegExp(${JSON.stringify(regexSrc)});
     const hit = links.find(h => re.test(h));
-    return hit ? hit.replace(/^#/, '') : null;
+    return hit ? clean(hit) : null;
   })()`);
 };
 
@@ -228,12 +259,67 @@ const shots = [
     run: async () => {
       const href = await detailHrefFromList(
         `/c/${CLUSTER}/cnpg/clusters`,
-        '/cnpg/clusters/cnpg-demo/demo-pg',
+        '/cnpg/clusters/cnpg-demo/demo-pg-ha',
         '/cnpg/clusters/[^/]+/[^/]+$'
       );
-      if (!href) throw new Error('no Cluster found — apply screenshots/cnpg-demo.yaml first?');
+      if (!href) throw new Error('no Cluster found — run screenshots/demo.sh create first?');
       await navigateAndSettle(href);
       await capture(`${OUT_DIR}/cluster-detail.png`);
+    },
+  },
+  {
+    name: 'cluster-logs',
+    // Taller, so the log stream fits.
+    height: 1500,
+    run: async () => {
+      const href = await detailHrefFromList(
+        `/c/${CLUSTER}/cnpg/clusters`,
+        '/cnpg/clusters/cnpg-demo/demo-pg-ha',
+        '/cnpg/clusters/[^/]+/[^/]+$'
+      );
+      if (!href) throw new Error('no Cluster found — run screenshots/demo.sh create first?');
+      await navigateAndSettle(href);
+      // The Logs tab has no URL, so click it.
+      const clicked = await evaluate(`(() => {
+        const tab = Array.from(document.querySelectorAll('[role="tab"]'))
+          .find(t => t.textContent.trim() === 'Logs');
+        if (!tab) return false;
+        tab.click();
+        return true;
+      })()`);
+      if (!clicked) throw new Error('Logs tab not found on the cluster detail page');
+      // Wait for log lines (the demo must have some).
+      const ROWS = '[role="button"][aria-pressed]:not(.MuiChip-root)';
+      const ready = await waitFor(
+        `document.body.textContent.includes('Insights') &&
+         document.querySelectorAll('${ROWS}').length >= 10`,
+        { timeoutMs: 30000 }
+      );
+      if (!ready) {
+        throw new Error('Logs tab showed no log lines — run screenshots/demo.sh traffic first?');
+      }
+      // Let the charts draw.
+      await sleep(2000);
+      // Show slow statements and app errors, and open a slow INSERT.
+      for (const label of ['Slow statements', 'App errors']) {
+        await evaluate(`Array.from(document.querySelectorAll('.MuiChip-root'))
+          .find(c => c.textContent.trim().startsWith(${JSON.stringify(label)}))?.click()`);
+        await sleep(400);
+      }
+      await sleep(400);
+      const opened = await evaluate(`(() => {
+        const rows = Array.from(document.querySelectorAll('${ROWS}'));
+        const row =
+          rows.find(r => r.textContent.includes('duration:') && r.textContent.includes('INSERT INTO orders')) ||
+          rows[0];
+        if (!row) return false;
+        row.click();
+        return true;
+      })()`);
+      if (!opened) throw new Error('No log line to open');
+      await waitFor(`!!document.querySelector('[aria-label="Log details"]')`, { timeoutMs: 5000 });
+      await sleep(800);
+      await capture(`${OUT_DIR}/cluster-logs.png`);
     },
   },
   {
@@ -284,8 +370,10 @@ if (!selected.length) {
 }
 for (const shot of selected) {
   console.log(`-- ${shot.name}`);
+  await setViewport(shot.height ?? VIEWPORT_H);
   await shot.run();
 }
+await setViewport(VIEWPORT_H);
 
 ws.close();
 console.log(`\nOK: ${selected.length} screenshot(s) in ${OUT_DIR}/`);

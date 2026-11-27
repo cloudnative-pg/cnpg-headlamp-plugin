@@ -1,34 +1,33 @@
-# Demo data for README screenshots.
+# Demo for the README screenshots and the Logs tab. screenshots/demo.sh creates it; you can
+# also apply it yourself with: kubectl create -f screenshots/cnpg-demo.yaml
 #
-# Apply against whatever cluster your local Headlamp points at:
-#   kubectl apply -f screenshots/cnpg-demo.yaml
-# or:
-#   ./screenshots/seed-demo.sh
-#
-# Design notes:
-# - Everything lives in `cnpg-demo` so it is easy to tear down
-#   (`kubectl delete namespace cnpg-demo`) and never collides with real workloads.
-# - The Cluster uses 3 instances + 1Gi storage so the list shows health pills,
-#   the primary/replica topology, and the sync-replication warning — the parts
-#   the README shots are meant to show. Drop `instances` to 1 on small laptops.
-# - ScheduledBackup uses `method: volumeSnapshot` so no S3/ObjectStore is needed.
-#   It will sit un-reconciled on clusters without a VolumeSnapshotClass — that is
-#   fine for screenshots, the row and detail page still render.
+# - Everything is in the cnpg-demo namespace, so it is easy to remove. 'demo.sh teardown'
+#   only deletes a namespace with the label below.
+# - 3 instances with 1Gi each, so the screenshots show replicas. Use 1 instance on a small laptop.
+# - Uses the default storage class. 'demo.sh --storage-class NAME' picks another.
+# - The log settings in the Cluster give the Logs tab connection and autovacuum lines.
+# - The ScheduledBackup uses volume snapshots, so no object store is needed. Without the
+#   VolumeSnapshot CRD the operator rejects it, so 'demo.sh create' leaves it out then.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: cnpg-demo
+  labels:
+    app.kubernetes.io/part-of: cnpg-headlamp-plugin-demo
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: demo-pg
+  name: demo-pg-ha
   namespace: cnpg-demo
 spec:
   instances: 3
   storage:
     size: 1Gi
-    storageClass: csi-hostpath-sc
+  postgresql:
+    parameters:
+      log_connections: 'on'
+      log_autovacuum_min_duration: '0'
   backup:
     volumeSnapshot:
       className: csi-hostpath-snapclass
@@ -36,11 +35,11 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
-  name: demo-pg-rw
+  name: demo-pg-ha-rw
   namespace: cnpg-demo
 spec:
   cluster:
-    name: demo-pg
+    name: demo-pg-ha
   instances: 2
   type: rw
   pgbouncer:
@@ -53,7 +52,7 @@ metadata:
   namespace: cnpg-demo
 spec:
   cluster:
-    name: demo-pg
+    name: demo-pg-ha
   name: demo-db
   owner: app
 ---
@@ -65,6 +64,6 @@ metadata:
 spec:
   schedule: '0 0 0 * * *'
   cluster:
-    name: demo-pg
+    name: demo-pg-ha
   backupOwnerReference: self
   method: volumeSnapshot
